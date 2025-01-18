@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { ArrowUpRight, TrendingUp, CreditCard, Wallet } from "lucide-react";
+import { ArrowUpRight, TrendingUp, CreditCard, Wallet, PiggyBank, AlertTriangle } from "lucide-react";
 
 export const FinancialMetrics = () => {
   return (
@@ -7,11 +7,11 @@ export const FinancialMetrics = () => {
       <Card className="p-4 hover:shadow-lg transition-shadow">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-sm text-muted-foreground">Credit Score</p>
-            <h3 className="text-2xl font-bold mt-1">750</h3>
+            <p className="text-sm text-muted-foreground">Loan Eligibility Score</p>
+            <h3 className="text-2xl font-bold mt-1">785</h3>
             <p className="text-xs text-primary mt-1 flex items-center">
               <ArrowUpRight size={12} className="mr-1" />
-              +15 pts this month
+              Excellent Range
             </p>
           </div>
           <div className="bg-primary/10 p-2 rounded-full">
@@ -23,12 +23,12 @@ export const FinancialMetrics = () => {
       <Card className="p-4 hover:shadow-lg transition-shadow">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-sm text-muted-foreground">Monthly Income</p>
-            <h3 className="text-2xl font-bold mt-1">₹85,000</h3>
-            <p className="text-xs text-primary mt-1">Last updated: Today</p>
+            <p className="text-sm text-muted-foreground">Debt-to-Income Ratio</p>
+            <h3 className="text-2xl font-bold mt-1">32%</h3>
+            <p className="text-xs text-primary mt-1">Good Standing</p>
           </div>
           <div className="bg-primary/10 p-2 rounded-full">
-            <Wallet size={20} className="text-primary" />
+            <PiggyBank size={20} className="text-primary" />
           </div>
         </div>
       </Card>
@@ -36,9 +36,12 @@ export const FinancialMetrics = () => {
       <Card className="p-4 hover:shadow-lg transition-shadow">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-sm text-muted-foreground">Total EMIs</p>
-            <h3 className="text-2xl font-bold mt-1">₹25,000</h3>
-            <p className="text-xs text-primary mt-1">3 active loans</p>
+            <p className="text-sm text-muted-foreground">Current EMI Load</p>
+            <h3 className="text-2xl font-bold mt-1">₹45,000</h3>
+            <p className="text-xs text-warning mt-1 flex items-center">
+              <AlertTriangle size={12} className="mr-1" />
+              Near Threshold
+            </p>
           </div>
           <div className="bg-primary/10 p-2 rounded-full">
             <CreditCard size={20} className="text-primary" />
@@ -49,12 +52,12 @@ export const FinancialMetrics = () => {
       <Card className="p-4 hover:shadow-lg transition-shadow">
         <div className="flex justify-between items-start">
           <div>
-            <p className="text-sm text-muted-foreground">Savings Rate</p>
-            <h3 className="text-2xl font-bold mt-1">28%</h3>
-            <p className="text-xs text-primary mt-1">Above average</p>
+            <p className="text-sm text-muted-foreground">Available Credit Limit</p>
+            <h3 className="text-2xl font-bold mt-1">₹12.5L</h3>
+            <p className="text-xs text-primary mt-1">Based on Income</p>
           </div>
           <div className="bg-primary/10 p-2 rounded-full">
-            <TrendingUp size={20} className="text-primary" />
+            <Wallet size={20} className="text-primary" />
           </div>
         </div>
       </Card>
