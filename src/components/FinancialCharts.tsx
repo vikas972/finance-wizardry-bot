@@ -14,8 +14,8 @@ const emiTrendData = [
 const expenseData = [
   { name: "Home Loan EMI", value: 45000, color: "#8BA888" },
   { name: "Car Loan EMI", value: 15000, color: "#2F4858" },
-  { name: "Credit Card", value: 10000, color: "#F0F7F4" },
-  { name: "Personal Loan", value: 8000, color: "#E5E5E5" },
+  { name: "Credit Card", value: 10000, color: "#5C8374" },
+  { name: "Personal Loan", value: 8000, color: "#183D3D" },
 ];
 
 const savingsData = [

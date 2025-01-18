@@ -18,6 +18,7 @@ import {
   Briefcase,
   Landmark
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface Message {
   text: string;
@@ -25,31 +26,98 @@ interface Message {
   timestamp: string;
 }
 
-const productSuites = [
+interface ChatResponse {
+  query: string;
+  response: string;
+  financial_context: any;
+}
+
+const API_URL = 'http://localhost:3000';
+const CUSTOMER_ID = 1; // For demo purposes, using customer ID 1
+
+interface ProductSuite {
+  icon: any;
+  text: string;
+  category: string;
+  description: string;
+  recommendedQueries: string[];
+}
+
+const productSuites: ProductSuite[] = [
   {
     icon: Home,
     text: "Home Loans & Mortgages",
     category: "Property Finance",
-    description: "Explore our range of home financing solutions"
+    description: "Explore our range of home financing solutions",
+    recommendedQueries: [
+      "Check home loan eligibility",
+      "Current home loan EMI details",
+      "Available interest rates",
+      "EMI reduction options",
+      "Balance transfer benefits"
+    ]
   },
   {
     icon: Briefcase,
     text: "Business Banking",
     category: "Corporate Solutions",
-    description: "Complete suite of business banking services"
+    description: "Complete suite of business banking services",
+    recommendedQueries: [
+      "Business loan eligibility",
+      "Current business loan rates",
+      "Business credit score",
+      "Working capital options",
+      "Expansion loan details"
+    ]
   },
   {
     icon: CreditCard,
     text: "Personal Banking",
     category: "Retail Banking",
-    description: "Day-to-day banking and credit solutions"
+    description: "Day-to-day banking and credit solutions",
+    recommendedQueries: [
+      "Show my credit score",
+      "Monthly spending analysis",
+      "Credit utilization",
+      "Credit score improvement",
+      "Savings optimization"
+    ]
   },
   {
     icon: Landmark,
     text: "Wealth Management",
     category: "Investment Services",
-    description: "Grow and protect your wealth"
+    description: "Grow and protect your wealth",
+    recommendedQueries: [
+      "Investment portfolio summary",
+      "Tax saving options",
+      "Available tax deductions",
+      "Investment suggestions",
+      "Returns optimization"
+    ]
+  },
+  {
+    icon: Calculator,
+    text: "Income Tax Returns",
+    category: "Tax Services",
+    description: "Tax planning and filing assistance",
+    recommendedQueries: [
+      "Tax saving analysis",
+      "Deductions overview",
+      "ITR filing status",
+      "Tax liability calculation",
+      "Investment proof status"
+    ]
   }
+];
+
+const starterQueries = [
+  "Can I buy a car in Dec 2025?",
+  "Should I transfer my home loan?",
+  "Monthly retirement savings needed?",
+  "Review my spending patterns",
+  "How to reduce EMI burden?",
+  "Suggest investment options"
 ];
 
 const Index = () => {
@@ -61,56 +129,76 @@ const Index = () => {
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<Array<{ role: string; content: string }>>([]);
+  const [selectedProduct, setSelectedProduct] = useState<ProductSuite | null>(null);
 
-  const mockAiResponse = async (userMessage: string) => {
-    setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+  const callChatAPI = async (userMessage: string) => {
+    try {
+      const response = await fetch(`${API_URL}/customers/${CUSTOMER_ID}/chat/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          query: userMessage,
+          conversation_history: conversationHistory.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          }))
+        })
+      });
 
-    let response = "";
-    if (userMessage.toLowerCase().includes("car")) {
-      response = "Based on your financial profile:\n\n" +
-        "- Loan Eligibility Score: 785 (Excellent)\n" +
-        "- Debt-to-Income Ratio: 32%\n" +
-        "- Current EMI Load: ₹45,000\n\n" +
-        "Given your excellent credit profile but considering your current EMI load, I recommend:\n" +
-        "1. Consider a car loan up to ₹8L with 3-year tenure\n" +
-        "2. Aim for EMI not exceeding ₹15,000\n" +
-        "3. Look for interest rates between 7.5-8.5%\n\n" +
-        "Would you like me to show you pre-approved car loan offers?";
-    } else if (userMessage.toLowerCase().includes("home loan")) {
-      response = "I've analyzed your home loan situation:\n\n" +
-        "Current market rates start from 7.2%\n" +
-        "Your profile qualifies for preferential rates\n\n" +
-        "Recommendations:\n" +
-        "1. Consider balance transfer if current rate > 8.5%\n" +
-        "2. Negotiate with current lender first\n" +
-        "3. Check for zero processing fee offers\n\n" +
-        "Would you like to see detailed calculations and top lender options?";
-    } else {
-      response = "Based on your financial profile, I can assist with:\n\n" +
-        "1. Loan eligibility assessment\n" +
-        "2. EMI optimization strategies\n" +
-        "3. Credit score improvement tips\n" +
-        "4. Investment recommendations\n\n" +
-        "What specific aspect would you like to explore?";
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('API Error:', errorData);
+        throw new Error(errorData.detail || 'API call failed');
+      }
+
+      const data: ChatResponse = await response.json();
+      
+      // Update conversation history
+      const newHistory = [
+        ...conversationHistory,
+        { role: "user", content: userMessage },
+        { role: "assistant", content: data.response }
+      ];
+      setConversationHistory(newHistory);
+
+      return data.response;
+    } catch (error) {
+      console.error('Error calling chat API:', error);
+      return "I apologize, but I'm having trouble accessing the financial data right now. Please try again in a moment.";
     }
-
-    setMessages(prev => [...prev, {
-      text: response,
-      isAi: true,
-      timestamp: new Date().toLocaleTimeString(),
-    }]);
-    setIsLoading(false);
   };
 
   const handleSendMessage = async (message: string) => {
-    const newMessage = {
+    setIsLoading(true);
+    
+    // Add user message
+    const userMessage = {
       text: message,
       isAi: false,
       timestamp: new Date().toLocaleTimeString(),
     };
-    setMessages(prev => [...prev, newMessage]);
-    await mockAiResponse(message);
+    setMessages(prev => [...prev, userMessage]);
+
+    // Get AI response
+    const aiResponse = await callChatAPI(message);
+    
+    // Add AI response
+    const aiMessage = {
+      text: aiResponse,
+      isAi: true,
+      timestamp: new Date().toLocaleTimeString(),
+    };
+    setMessages(prev => [...prev, aiMessage]);
+    
+    setIsLoading(false);
+  };
+
+  const handleProductClick = (product: ProductSuite) => {
+    setSelectedProduct(product);
   };
 
   return (
@@ -152,24 +240,50 @@ const Index = () => {
                   <div className="p-4 bg-accent/50">
                     <h3 className="font-semibold mb-2 flex items-center gap-2">
                       <Lightbulb className="w-4 h-4" />
-                      Product Suites
+                      {selectedProduct ? selectedProduct.text : "Suggested Questions"}
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {productSuites.map((product, index) => (
-                        <Button
-                          key={index}
-                          variant="outline"
-                          className="w-full justify-start text-left"
-                          onClick={() => handleSendMessage(`Tell me more about ${product.text}`)}
-                        >
-                          <product.icon className="w-4 h-4 mr-2" />
-                          <div>
-                            <p className="text-sm font-medium">{product.text}</p>
-                            <p className="text-xs text-muted-foreground">{product.description}</p>
-                          </div>
-                        </Button>
-                      ))}
+                      {selectedProduct ? (
+                        // Show product-specific questions
+                        selectedProduct.recommendedQueries.map((query, index) => (
+                          <Button
+                            key={index}
+                            variant="outline"
+                            className="w-full justify-start text-left"
+                            onClick={() => handleSendMessage(query)}
+                          >
+                            <MessageSquare className="w-4 h-4 mr-2" />
+                            <div>
+                              <p className="text-sm font-medium">{query}</p>
+                            </div>
+                          </Button>
+                        ))
+                      ) : (
+                        // Show default starter queries
+                        starterQueries.map((query, index) => (
+                          <Button
+                            key={index}
+                            variant="outline"
+                            className="w-full justify-start text-left"
+                            onClick={() => handleSendMessage(query)}
+                          >
+                            <MessageSquare className="w-4 h-4 mr-2" />
+                            <div>
+                              <p className="text-sm font-medium">{query}</p>
+                            </div>
+                          </Button>
+                        ))
+                      )}
                     </div>
+                    {selectedProduct && (
+                      <Button
+                        className="mt-4 w-full"
+                        variant="secondary"
+                        onClick={() => setSelectedProduct(null)}
+                      >
+                        Back to Suggested Questions
+                      </Button>
+                    )}
                   </div>
                   <ChatInput onSend={handleSendMessage} isLoading={isLoading} />
                 </div>
@@ -182,8 +296,11 @@ const Index = () => {
                     <Button
                       key={index}
                       variant="outline"
-                      className="w-full justify-start text-left"
-                      onClick={() => handleSendMessage(`Tell me more about ${product.text}`)}
+                      className={cn(
+                        "w-full justify-start text-left",
+                        selectedProduct?.text === product.text && "bg-accent"
+                      )}
+                      onClick={() => handleProductClick(product)}
                     >
                       <product.icon className="w-4 h-4 mr-2" />
                       <div>

@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { MessageCircle, Bot } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
 
 interface ChatMessageProps {
   message: string;
@@ -7,33 +7,22 @@ interface ChatMessageProps {
   timestamp: string;
 }
 
-export const ChatMessage = ({ message, isAi, timestamp }: ChatMessageProps) => {
+export function ChatMessage({ message, isAi, timestamp }: ChatMessageProps) {
   return (
     <div
       className={cn(
-        "flex w-full gap-4 p-6 animate-fade-up",
-        isAi ? "bg-accent/50 backdrop-blur-sm" : "bg-background"
+        "flex w-full gap-2 p-4 border-b",
+        isAi ? "bg-muted/50" : "bg-background"
       )}
     >
-      <div
-        className={cn(
-          "flex h-8 w-8 shrink-0 select-none items-center justify-center rounded-md",
-          isAi ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"
-        )}
-      >
-        {isAi ? <Bot size={18} /> : <MessageCircle size={18} />}
-      </div>
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold">
-            {isAi ? "Financial Advisor" : "You"}
-          </span>
-          <span className="text-sm text-muted-foreground">{timestamp}</span>
+      <div className="flex-1">
+        <div className="prose prose-sm dark:prose-invert max-w-none">
+          <ReactMarkdown>{message}</ReactMarkdown>
         </div>
-        <div className="prose prose-sm max-w-none">
-          <p className="leading-relaxed text-secondary">{message}</p>
+        <div className="text-xs text-muted-foreground mt-2">
+          {timestamp}
         </div>
       </div>
     </div>
   );
-};
+}
