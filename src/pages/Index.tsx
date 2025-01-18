@@ -12,7 +12,11 @@ import {
   LayoutDashboard,
   Calculator,
   RefreshCw,
-  PiggyBank 
+  PiggyBank,
+  CreditCard,
+  Home,
+  Briefcase,
+  Landmark
 } from "lucide-react";
 
 interface Message {
@@ -21,22 +25,31 @@ interface Message {
   timestamp: string;
 }
 
-const recommendedQueries = [
+const productSuites = [
   {
-    icon: Calculator,
-    text: "Can I afford to buy a car in December 2025?",
-    category: "Auto Loan",
+    icon: Home,
+    text: "Home Loans & Mortgages",
+    category: "Property Finance",
+    description: "Explore our range of home financing solutions"
   },
   {
-    icon: RefreshCw,
-    text: "Should I transfer my home loan to get better rates?",
-    category: "Home Loan",
+    icon: Briefcase,
+    text: "Business Banking",
+    category: "Corporate Solutions",
+    description: "Complete suite of business banking services"
   },
   {
-    icon: PiggyBank,
-    text: "How can I optimize my monthly EMIs?",
-    category: "Financial Planning",
+    icon: CreditCard,
+    text: "Personal Banking",
+    category: "Retail Banking",
+    description: "Day-to-day banking and credit solutions"
   },
+  {
+    icon: Landmark,
+    text: "Wealth Management",
+    category: "Investment Services",
+    description: "Grow and protect your wealth"
+  }
 ];
 
 const Index = () => {
@@ -139,20 +152,20 @@ const Index = () => {
                   <div className="p-4 bg-accent/50">
                     <h3 className="font-semibold mb-2 flex items-center gap-2">
                       <Lightbulb className="w-4 h-4" />
-                      Recommended Actions
+                      Product Suites
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {recommendedQueries.map((query, index) => (
+                      {productSuites.map((product, index) => (
                         <Button
                           key={index}
                           variant="outline"
                           className="w-full justify-start text-left"
-                          onClick={() => handleSendMessage(query.text)}
+                          onClick={() => handleSendMessage(`Tell me more about ${product.text}`)}
                         >
-                          <query.icon className="w-4 h-4 mr-2" />
+                          <product.icon className="w-4 h-4 mr-2" />
                           <div>
-                            <p className="text-sm">{query.text}</p>
-                            <p className="text-xs text-muted-foreground">{query.category}</p>
+                            <p className="text-sm font-medium">{product.text}</p>
+                            <p className="text-xs text-muted-foreground">{product.description}</p>
                           </div>
                         </Button>
                       ))}
@@ -163,19 +176,19 @@ const Index = () => {
               </Card>
 
               <Card className="p-4">
-                <h3 className="font-semibold mb-4">Recommended Queries</h3>
+                <h3 className="font-semibold mb-4">Financial Products</h3>
                 <div className="space-y-2">
-                  {recommendedQueries.map((query, index) => (
+                  {productSuites.map((product, index) => (
                     <Button
                       key={index}
                       variant="outline"
                       className="w-full justify-start text-left"
-                      onClick={() => handleSendMessage(query.text)}
+                      onClick={() => handleSendMessage(`Tell me more about ${product.text}`)}
                     >
-                      <query.icon className="w-4 h-4 mr-2" />
+                      <product.icon className="w-4 h-4 mr-2" />
                       <div>
-                        <p className="text-sm">{query.text}</p>
-                        <p className="text-xs text-muted-foreground">{query.category}</p>
+                        <p className="text-sm font-medium">{product.text}</p>
+                        <p className="text-xs text-muted-foreground">{product.category}</p>
                       </div>
                     </Button>
                   ))}
