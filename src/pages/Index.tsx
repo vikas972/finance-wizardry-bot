@@ -3,6 +3,7 @@ import { ChatMessage } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
 import { FinancialMetrics } from "@/components/FinancialMetrics";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 interface Message {
   text: string;
