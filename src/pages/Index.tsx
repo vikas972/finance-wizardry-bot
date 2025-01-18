@@ -2,15 +2,34 @@ import { useState } from "react";
 import { ChatMessage } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
 import { FinancialMetrics } from "@/components/FinancialMetrics";
+import { FinancialCharts } from "@/components/FinancialCharts";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Lightbulb, TrendingUp, ShieldCheck } from "lucide-react";
+import { Lightbulb, TrendingUp, ShieldCheck, Calculator, RefreshCw, PiggyBank } from "lucide-react";
 
 interface Message {
   text: string;
   isAi: boolean;
   timestamp: string;
 }
+
+const recommendedQueries = [
+  {
+    icon: Calculator,
+    text: "Can I afford to buy a car in December 2025?",
+    category: "Auto Loan",
+  },
+  {
+    icon: RefreshCw,
+    text: "Should I transfer my home loan to get better rates?",
+    category: "Home Loan",
+  },
+  {
+    icon: PiggyBank,
+    text: "How can I optimize my monthly EMIs?",
+    category: "Financial Planning",
+  },
+];
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([
@@ -79,6 +98,7 @@ const Index = () => {
         <h1 className="text-4xl font-bold text-center mb-8">AI Financial Advisor</h1>
         
         <FinancialMetrics />
+        <FinancialCharts />
 
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-4 gap-8">
           <Card className="lg:col-span-3 overflow-hidden flex flex-col max-h-[600px]">
@@ -114,29 +134,22 @@ const Index = () => {
           </Card>
 
           <Card className="p-4">
-            <h3 className="font-semibold mb-4">Quick Actions</h3>
+            <h3 className="font-semibold mb-4">Recommended Queries</h3>
             <div className="space-y-2">
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => handleSendMessage("Can I afford to buy a car in December 2025?")}
-              >
-                Car Loan Eligibility
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => handleSendMessage("Should I transfer my home loan?")}
-              >
-                Home Loan Transfer
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => handleSendMessage("How can I improve my loan eligibility?")}
-              >
-                Improve Eligibility
-              </Button>
+              {recommendedQueries.map((query, index) => (
+                <Button
+                  key={index}
+                  variant="outline"
+                  className="w-full justify-start text-left"
+                  onClick={() => handleSendMessage(query.text)}
+                >
+                  <query.icon className="w-4 h-4 mr-2" />
+                  <div>
+                    <p className="text-sm">{query.text}</p>
+                    <p className="text-xs text-muted-foreground">{query.category}</p>
+                  </div>
+                </Button>
+              ))}
             </div>
           </Card>
         </div>
