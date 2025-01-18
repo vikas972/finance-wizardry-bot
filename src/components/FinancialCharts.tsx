@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { Area, AreaChart, CartesianGrid, Line, LineChart, PieChart, Pie, ResponsiveContainer, XAxis, YAxis, Cell, Legend } from "recharts";
 
 const emiTrendData = [
@@ -28,15 +28,24 @@ const savingsData = [
 ];
 
 const chartConfig = {
-  line: {
-    color: "#8BA888",
+  emiLine: {
+    color: "#8BA888"
   },
-  area: {
-    color: "#2F4858",
+  savingsArea: {
+    color: "#2F4858"
   },
-  pie: {
-    colors: ["#8BA888", "#2F4858", "#F0F7F4", "#E5E5E5"],
+  expensePie1: {
+    color: "#8BA888"
   },
+  expensePie2: {
+    color: "#2F4858"
+  },
+  expensePie3: {
+    color: "#F0F7F4"
+  },
+  expensePie4: {
+    color: "#E5E5E5"
+  }
 };
 
 export const FinancialCharts = () => {
@@ -52,7 +61,7 @@ export const FinancialCharts = () => {
                 <XAxis dataKey="month" />
                 <YAxis />
                 <ChartTooltip />
-                <Line type="monotone" dataKey="amount" stroke="#8BA888" strokeWidth={2} />
+                <Line type="monotone" dataKey="amount" stroke={chartConfig.emiLine.color} strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </ChartContainer>
@@ -74,8 +83,8 @@ export const FinancialCharts = () => {
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {expenseData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  {expenseData.map((entry) => (
+                    <Cell key={`cell-${entry.name}`} fill={entry.color} />
                   ))}
                 </Pie>
                 <Legend />
@@ -96,7 +105,7 @@ export const FinancialCharts = () => {
                 <XAxis dataKey="month" />
                 <YAxis />
                 <ChartTooltip />
-                <Area type="monotone" dataKey="amount" stroke="#2F4858" fill="#F0F7F4" />
+                <Area type="monotone" dataKey="amount" stroke={chartConfig.savingsArea.color} fill="#F0F7F4" />
               </AreaChart>
             </ResponsiveContainer>
           </ChartContainer>
