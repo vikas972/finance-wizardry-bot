@@ -1,69 +1,145 @@
-# Welcome to your Lovable project
+# Finance Wizardry Bot
 
-## Project info
+An AI-powered financial advisor chatbot that helps users with personalized financial guidance, loan analysis, and investment recommendations.
 
-**URL**: https://lovable.dev/projects/e5968a6b-54e9-4f59-9847-0d420a4a43d0
+## Features
 
-## How can I edit this code?
+- Interactive AI Chat Assistant
+- Financial Dashboard with Metrics and Charts
+- Product-specific Financial Advice
+- Real-time Data Analysis
+- Tax Planning Assistance
 
-There are several ways of editing your application.
+## Prerequisites
 
-**Use Lovable**
+- Node.js (v16 or higher)
+- Python (3.8 or higher)
+- PostgreSQL (13 or higher)
+- npm or yarn package manager
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/e5968a6b-54e9-4f59-9847-0d420a4a43d0) and start prompting.
+## Project Structure
 
-Changes made via Lovable will be committed automatically to this repo.
+```
+finance-wizardry-bot/
+├── backend/              # FastAPI backend
+│   ├── models.py        # Database models
+│   ├── schemas.py       # Pydantic schemas
+│   ├── main.py         # Main FastAPI application
+│   └── requirements.txt # Python dependencies
+└── frontend/           # React/TypeScript frontend
+    ├── src/           # Source code
+    ├── package.json   # Node dependencies
+    └── vite.config.ts # Vite configuration
+```
 
-**Use your preferred IDE**
+## Setup Instructions
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Backend Setup
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. Create and activate a Python virtual environment:
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
-Follow these steps:
+2. Install Python dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+3. Set up PostgreSQL:
+- Create a database named 'customer_info'
+- Update .env file with your database credentials
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+4. Initialize the database:
+```bash
+python create_db.py
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
+5. Start the backend server:
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 3000
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### Frontend Setup
+
+1. Install Node.js dependencies:
+```bash
+cd ../  # Return to project root
+npm install
+```
+
+2. Start the development server:
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The application will be available at `http://localhost:5173`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Environment Variables
 
-**Use GitHub Codespaces**
+### Backend (.env)
+```
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=5432
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=customer_info
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+# OpenAI Configuration
+OPENAI_API_TYPE=azure
+OPENAI_API_BASE=https://eastusigtb.openai.azure.com/
+OPENAI_API_VERSION=2024-02-15-preview
+OPENAI_API_KEY=your_api_key
+```
 
-## What technologies are used for this project?
+## API Documentation
 
-This project is built with .
+Once the backend is running, you can access:
+- API documentation: `http://localhost:3000/docs`
+- Alternative documentation: `http://localhost:3000/redoc`
 
-- Vite
-- TypeScript
+## Available Scripts
+
+Frontend:
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+
+Backend:
+- `uvicorn main:app --reload` - Start development server
+- `python create_db.py` - Initialize database
+- `python sample_data.py` - Load sample data (optional)
+
+## Tech Stack
+
+Frontend:
 - React
-- shadcn-ui
+- TypeScript
+- Vite
 - Tailwind CSS
+- shadcn/ui
+- Recharts
 
-## How can I deploy this project?
+Backend:
+- FastAPI
+- SQLAlchemy
+- PostgreSQL
+- OpenAI API
+- sentence-transformers
 
-Simply open [Lovable](https://lovable.dev/projects/e5968a6b-54e9-4f59-9847-0d420a4a43d0) and click on Share -> Publish.
+## Troubleshooting
 
-## I want to use a custom domain - is that possible?
+1. Database Connection Issues:
+   - Verify PostgreSQL is running
+   - Check database credentials in .env
+   - Ensure database 'customer_info' exists
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+2. OpenAI API Issues:
+   - Verify API key in .env
+   - Check API endpoint configuration
+
+3. CORS Issues:
+   - Backend is configured to accept requests from localhost:5173
+   - If using different ports, update CORS settings in main.py
