@@ -27,61 +27,79 @@ const savingsData = [
   { month: "Jun", amount: 35000 },
 ];
 
+const chartConfig = {
+  line: {
+    color: "#8BA888",
+  },
+  area: {
+    color: "#2F4858",
+  },
+  pie: {
+    colors: ["#8BA888", "#2F4858", "#F0F7F4", "#E5E5E5"],
+  },
+};
+
 export const FinancialCharts = () => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4">
       <Card className="p-4">
         <h3 className="text-lg font-semibold mb-4">EMI Trend Analysis</h3>
         <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={emiTrendData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <ChartTooltip content={(props) => <ChartTooltipContent {...props} />} />
-              <Line type="monotone" dataKey="amount" stroke="#8BA888" strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
+          <ChartContainer config={chartConfig}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={emiTrendData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <ChartTooltip />
+                <Line type="monotone" dataKey="amount" stroke="#8BA888" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartContainer>
         </div>
       </Card>
 
       <Card className="p-4">
         <h3 className="text-lg font-semibold mb-4">Monthly Expense Breakdown</h3>
         <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={expenseData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                paddingAngle={5}
-                dataKey="value"
-              >
-                {expenseData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Legend />
-              <ChartTooltip content={(props) => <ChartTooltipContent {...props} />} />
-            </PieChart>
-          </ResponsiveContainer>
+          <ChartContainer config={chartConfig}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={expenseData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {expenseData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Legend />
+                <ChartTooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartContainer>
         </div>
       </Card>
 
       <Card className="p-4">
         <h3 className="text-lg font-semibold mb-4">Savings Potential</h3>
         <div className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={savingsData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <ChartTooltip content={(props) => <ChartTooltipContent {...props} />} />
-              <Area type="monotone" dataKey="amount" stroke="#2F4858" fill="#F0F7F4" />
-            </AreaChart>
-          </ResponsiveContainer>
+          <ChartContainer config={chartConfig}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={savingsData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <ChartTooltip />
+                <Area type="monotone" dataKey="amount" stroke="#2F4858" fill="#F0F7F4" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartContainer>
         </div>
       </Card>
     </div>
