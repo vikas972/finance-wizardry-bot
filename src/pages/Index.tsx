@@ -5,7 +5,8 @@ import { FinancialMetrics } from "@/components/FinancialMetrics";
 import { FinancialCharts } from "@/components/FinancialCharts";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Lightbulb, TrendingUp, ShieldCheck, Calculator, RefreshCw, PiggyBank } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Lightbulb, MessageSquare, LayoutDashboard } from "lucide-react";
 
 interface Message {
   text: string;
@@ -97,62 +98,85 @@ const Index = () => {
       <div className="container mx-auto py-8">
         <h1 className="text-4xl font-bold text-center mb-8">AI Financial Advisor</h1>
         
-        <FinancialMetrics />
-        <FinancialCharts />
+        <Tabs defaultValue="dashboard" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-8">
+            <TabsTrigger value="dashboard" className="flex items-center gap-2">
+              <LayoutDashboard className="w-4 h-4" />
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="chat" className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Chat Assistant
+            </TabsTrigger>
+          </TabsList>
 
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <Card className="lg:col-span-3 overflow-hidden flex flex-col max-h-[600px]">
-            <div className="flex-1 overflow-y-auto">
-              {messages.map((message, index) => (
-                <ChatMessage
-                  key={index}
-                  message={message.text}
-                  isAi={message.isAi}
-                  timestamp={message.timestamp}
-                />
-              ))}
-            </div>
-            <div className="border-t">
-              <div className="p-4 bg-accent/50">
-                <h3 className="font-semibold mb-2 flex items-center gap-2">
-                  <Lightbulb className="w-4 h-4" />
-                  Recommended Actions
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <TrendingUp className="w-4 h-4" />
-                    Consider debt consolidation to optimize EMIs
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <ShieldCheck className="w-4 h-4" />
-                    Review credit report for better rates
-                  </div>
+          <TabsContent value="dashboard" className="space-y-8">
+            <FinancialMetrics />
+            <FinancialCharts />
+          </TabsContent>
+
+          <TabsContent value="chat">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+              <Card className="lg:col-span-3 overflow-hidden flex flex-col h-[600px]">
+                <div className="flex-1 overflow-y-auto">
+                  {messages.map((message, index) => (
+                    <ChatMessage
+                      key={index}
+                      message={message.text}
+                      isAi={message.isAi}
+                      timestamp={message.timestamp}
+                    />
+                  ))}
                 </div>
-              </div>
-              <ChatInput onSend={handleSendMessage} isLoading={isLoading} />
-            </div>
-          </Card>
-
-          <Card className="p-4">
-            <h3 className="font-semibold mb-4">Recommended Queries</h3>
-            <div className="space-y-2">
-              {recommendedQueries.map((query, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  className="w-full justify-start text-left"
-                  onClick={() => handleSendMessage(query.text)}
-                >
-                  <query.icon className="w-4 h-4 mr-2" />
-                  <div>
-                    <p className="text-sm">{query.text}</p>
-                    <p className="text-xs text-muted-foreground">{query.category}</p>
+                <div className="border-t">
+                  <div className="p-4 bg-accent/50">
+                    <h3 className="font-semibold mb-2 flex items-center gap-2">
+                      <Lightbulb className="w-4 h-4" />
+                      Recommended Actions
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {recommendedQueries.map((query, index) => (
+                        <Button
+                          key={index}
+                          variant="outline"
+                          className="w-full justify-start text-left"
+                          onClick={() => handleSendMessage(query.text)}
+                        >
+                          <query.icon className="w-4 h-4 mr-2" />
+                          <div>
+                            <p className="text-sm">{query.text}</p>
+                            <p className="text-xs text-muted-foreground">{query.category}</p>
+                          </div>
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                </Button>
-              ))}
+                  <ChatInput onSend={handleSendMessage} isLoading={isLoading} />
+                </div>
+              </Card>
+
+              <Card className="p-4">
+                <h3 className="font-semibold mb-4">Recommended Queries</h3>
+                <div className="space-y-2">
+                  {recommendedQueries.map((query, index) => (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      className="w-full justify-start text-left"
+                      onClick={() => handleSendMessage(query.text)}
+                    >
+                      <query.icon className="w-4 h-4 mr-2" />
+                      <div>
+                        <p className="text-sm">{query.text}</p>
+                        <p className="text-xs text-muted-foreground">{query.category}</p>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+              </Card>
             </div>
-          </Card>
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
