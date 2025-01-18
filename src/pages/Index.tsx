@@ -6,7 +6,14 @@ import { FinancialCharts } from "@/components/FinancialCharts";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Lightbulb, MessageSquare, LayoutDashboard } from "lucide-react";
+import { 
+  Lightbulb, 
+  MessageSquare, 
+  LayoutDashboard,
+  Calculator,
+  RefreshCw,
+  PiggyBank 
+} from "lucide-react";
 
 interface Message {
   text: string;
