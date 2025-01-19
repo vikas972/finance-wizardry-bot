@@ -14,6 +14,7 @@ class Customer(Base):
     aa_data = relationship("AAData", back_populates="customer")
     bureau_data = relationship("BureauData", back_populates="customer")
     itr_data = relationship("ITRData", back_populates="customer")
+    loan_eligibility_metrics = relationship("LoanEligibilityMetrics", back_populates="customer", uselist=False)
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -59,4 +60,18 @@ class ITRData(Base):
     deductions = Column(JSON)
     vector_embedding = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    customer = relationship("Customer", back_populates="itr_data") 
+    customer = relationship("Customer", back_populates="itr_data")
+
+class LoanEligibilityMetrics(Base):
+    __tablename__ = "loan_eligibility_metrics"
+
+    id = Column(Integer, primary_key=True, index=True)
+    customer_id = Column(Integer, ForeignKey("customers.id"))
+    eligibility_score = Column(Integer)
+    score_range = Column(String)  # e.g., "Excellent", "Good", "Fair", "Poor"
+    debt_to_income_ratio = Column(Float)
+    dti_status = Column(String)  # e.g., "Good Standing", "Warning", "Critical"
+    current_emi_load = Column(Float)
+    emi_status = Column(String)  # e.g., "Below Threshold", "Near Threshold", "Above Threshold"
+
+    customer = relationship("Customer", back_populates="loan_eligibility_metrics") 

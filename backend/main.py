@@ -52,10 +52,22 @@ def create_customer(customer: schemas.CustomerCreate, db: Session = Depends(get_
     db.refresh(db_customer)
     return db_customer
 
-@app.get("/customers/", response_model=List[schemas.Customer])
-def read_customers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    customers = db.query(models.Customer).offset(skip).limit(limit).all()
-    return customers
+@app.get("/customers/")
+async def read_customers(db: Session = Depends(get_db)):
+    try:
+        customers = db.query(models.Customer).all()
+        return [
+            {
+                "id": customer.id,
+                "name": customer.name,
+                "email": customer.email,
+                "created_at": customer.created_at.isoformat()
+            }
+            for customer in customers
+        ]
+    except Exception as e:
+        print(f"Error fetching customers: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/customers/{customer_id}", response_model=schemas.Customer)
 def read_customer(customer_id: int, db: Session = Depends(get_db)):
@@ -361,4 +373,23 @@ async def debug_customer_data(customer_id: int, db: Session = Depends(get_db)):
         "bureau_data": [data.__dict__ for data in customer.bureau_data],
         "itr_data": [data.__dict__ for data in customer.itr_data],
         "transactions": [t.__dict__ for t in customer.transactions]
+    } 
+
+@app.get("/customers/{customer_id}/loan-eligibility")
+def get_loan_eligibility(customer_id: int, db: Session = Depends(get_db)):
+    # Get the customer's loan eligibility metrics
+    metrics = db.query(models.LoanEligibilityMetrics).filter(
+        models.LoanEligibilityMetrics.customer_id == customer_id
+    ).first()
+    
+    if not metrics:
+        raise HTTPException(status_code=404, detail="Loan eligibility metrics not found")
+    
+    return {
+        "eligibility_score": metrics.eligibility_score,
+        "score_range": metrics.score_range,
+        "debt_to_income_ratio": metrics.debt_to_income_ratio,
+        "dti_status": metrics.dti_status,
+        "current_emi_load": metrics.current_emi_load,
+        "emi_status": metrics.emi_status
     } 
