@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChatMessage } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
 import { FinancialMetrics } from "@/components/FinancialMetrics";
@@ -32,8 +32,13 @@ interface ChatResponse {
   financial_context: any;
 }
 
+interface Customer {
+  id: number;
+  name: string;
+  email: string;
+}
+
 const API_URL = 'http://localhost:3000';
-const CUSTOMER_ID = 1; // For demo purposes, using customer ID 1
 
 interface ProductSuite {
   icon: any;
@@ -131,10 +136,52 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [conversationHistory, setConversationHistory] = useState<Array<{ role: string; content: string }>>([]);
   const [selectedProduct, setSelectedProduct] = useState<ProductSuite | null>(null);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+
+  // Reset chat when customer changes
+  const handleCustomerChange = (customerId: number) => {
+    setSelectedCustomerId(customerId);
+    // Reset chat to initial state
+    setMessages([
+      {
+        text: "Hello! I'm your AI financial advisor. I can help you make informed decisions about loans, investments, and your overall financial health. What would you like to know?",
+        isAi: true,
+        timestamp: new Date().toLocaleTimeString(),
+      },
+    ]);
+    setConversationHistory([]);
+    setSelectedProduct(null);
+  };
+
+  // Fetch customers when component mounts
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        const response = await fetch(`${API_URL}/customers/`);
+        if (response.ok) {
+          const data = await response.json();
+          setCustomers(data);
+          // Set first customer as default if available
+          if (data.length > 0) {
+            handleCustomerChange(data[0].id);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching customers:', error);
+      }
+    };
+    fetchCustomers();
+  }, []);
 
   const callChatAPI = async (userMessage: string) => {
+    if (!selectedCustomerId) {
+      return "Please select a customer first.";
+    }
+
     try {
-      const response = await fetch(`${API_URL}/customers/${CUSTOMER_ID}/chat/`, {
+      // First, ensure we have fresh customer data
+      const response = await fetch(`${API_URL}/customers/${selectedCustomerId}/chat/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -142,10 +189,14 @@ const Index = () => {
         },
         body: JSON.stringify({
           query: userMessage,
-          conversation_history: conversationHistory.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          }))
+          conversation_history: [
+            // Only include the last few messages for context, but not too many to avoid confusion
+            ...conversationHistory.slice(-4).map(msg => ({
+              role: msg.role,
+              content: msg.content
+            })),
+            { role: "user", content: userMessage }
+          ]
         })
       });
 
@@ -157,9 +208,9 @@ const Index = () => {
 
       const data: ChatResponse = await response.json();
       
-      // Update conversation history
+      // Update conversation history with only the latest exchange
       const newHistory = [
-        ...conversationHistory,
+        ...conversationHistory.slice(-4), // Keep only last 4 messages for context
         { role: "user", content: userMessage },
         { role: "assistant", content: data.response }
       ];
@@ -204,116 +255,139 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto py-8">
-        <h1 className="text-4xl font-bold text-center mb-8">AI Financial Advisor</h1>
-        
-        <Tabs defaultValue="dashboard" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8">
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
-              <LayoutDashboard className="w-4 h-4" />
-              Dashboard
-            </TabsTrigger>
-            <TabsTrigger value="chat" className="flex items-center gap-2">
-              <MessageSquare className="w-4 h-4" />
-              Chat Assistant
-            </TabsTrigger>
-          </TabsList>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-4xl font-bold">AI Financial Advisor</h1>
+          <div className="flex items-center gap-4">
+            <select
+              className="p-2 border rounded-md"
+              value={selectedCustomerId || ''}
+              onChange={(e) => handleCustomerChange(Number(e.target.value))}
+            >
+              <option value="">Select Customer</option>
+              {customers.map(customer => (
+                <option key={customer.id} value={customer.id}>
+                  {customer.name} ({customer.email})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
 
-          <TabsContent value="dashboard" className="space-y-8">
-            <FinancialMetrics />
-            <FinancialCharts />
-          </TabsContent>
+        {selectedCustomerId ? (
+          <Tabs defaultValue="dashboard" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-8">
+              <TabsTrigger value="dashboard" className="flex items-center gap-2">
+                <LayoutDashboard className="w-4 h-4" />
+                Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="chat" className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                Chat Assistant
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="chat">
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-              <Card className="lg:col-span-3 overflow-hidden flex flex-col h-[600px]">
-                <div className="flex-1 overflow-y-auto">
-                  {messages.map((message, index) => (
-                    <ChatMessage
-                      key={index}
-                      message={message.text}
-                      isAi={message.isAi}
-                      timestamp={message.timestamp}
-                    />
-                  ))}
-                </div>
-                <div className="border-t">
-                  <div className="p-4 bg-accent/50">
-                    <h3 className="font-semibold mb-2 flex items-center gap-2">
-                      <Lightbulb className="w-4 h-4" />
-                      {selectedProduct ? selectedProduct.text : "Suggested Questions"}
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {selectedProduct ? (
-                        // Show product-specific questions
-                        selectedProduct.recommendedQueries.map((query, index) => (
-                          <Button
-                            key={index}
-                            variant="outline"
-                            className="w-full justify-start text-left"
-                            onClick={() => handleSendMessage(query)}
-                          >
-                            <MessageSquare className="w-4 h-4 mr-2" />
-                            <div>
-                              <p className="text-sm font-medium">{query}</p>
-                            </div>
-                          </Button>
-                        ))
-                      ) : (
-                        // Show default starter queries
-                        starterQueries.map((query, index) => (
-                          <Button
-                            key={index}
-                            variant="outline"
-                            className="w-full justify-start text-left"
-                            onClick={() => handleSendMessage(query)}
-                          >
-                            <MessageSquare className="w-4 h-4 mr-2" />
-                            <div>
-                              <p className="text-sm font-medium">{query}</p>
-                            </div>
-                          </Button>
-                        ))
+            <TabsContent value="dashboard" className="space-y-8">
+              <FinancialMetrics customerId={selectedCustomerId!} />
+              <FinancialCharts />
+            </TabsContent>
+
+            <TabsContent value="chat">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                <Card className="lg:col-span-3 overflow-hidden flex flex-col h-[600px]">
+                  <div className="flex-1 overflow-y-auto">
+                    {messages.map((message, index) => (
+                      <ChatMessage
+                        key={index}
+                        message={message.text}
+                        isAi={message.isAi}
+                        timestamp={message.timestamp}
+                      />
+                    ))}
+                  </div>
+                  <div className="border-t">
+                    <div className="p-4 bg-accent/50">
+                      <h3 className="font-semibold mb-2 flex items-center gap-2">
+                        <Lightbulb className="w-4 h-4" />
+                        {selectedProduct ? selectedProduct.text : "Suggested Questions"}
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {selectedProduct ? (
+                          // Show product-specific questions
+                          selectedProduct.recommendedQueries.map((query, index) => (
+                            <Button
+                              key={index}
+                              variant="outline"
+                              className="w-full justify-start text-left"
+                              onClick={() => handleSendMessage(query)}
+                            >
+                              <MessageSquare className="w-4 h-4 mr-2" />
+                              <div>
+                                <p className="text-sm font-medium">{query}</p>
+                              </div>
+                            </Button>
+                          ))
+                        ) : (
+                          // Show default starter queries
+                          starterQueries.map((query, index) => (
+                            <Button
+                              key={index}
+                              variant="outline"
+                              className="w-full justify-start text-left"
+                              onClick={() => handleSendMessage(query)}
+                            >
+                              <MessageSquare className="w-4 h-4 mr-2" />
+                              <div>
+                                <p className="text-sm font-medium">{query}</p>
+                              </div>
+                            </Button>
+                          ))
+                        )}
+                      </div>
+                      {selectedProduct && (
+                        <Button
+                          className="mt-4 w-full"
+                          variant="secondary"
+                          onClick={() => setSelectedProduct(null)}
+                        >
+                          Back to Suggested Questions
+                        </Button>
                       )}
                     </div>
-                    {selectedProduct && (
-                      <Button
-                        className="mt-4 w-full"
-                        variant="secondary"
-                        onClick={() => setSelectedProduct(null)}
-                      >
-                        Back to Suggested Questions
-                      </Button>
-                    )}
+                    <ChatInput onSend={handleSendMessage} isLoading={isLoading} />
                   </div>
-                  <ChatInput onSend={handleSendMessage} isLoading={isLoading} />
-                </div>
-              </Card>
+                </Card>
 
-              <Card className="p-4">
-                <h3 className="font-semibold mb-4">Financial Products</h3>
-                <div className="space-y-2">
-                  {productSuites.map((product, index) => (
-                    <Button
-                      key={index}
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left",
-                        selectedProduct?.text === product.text && "bg-accent"
-                      )}
-                      onClick={() => handleProductClick(product)}
-                    >
-                      <product.icon className="w-4 h-4 mr-2" />
-                      <div>
-                        <p className="text-sm font-medium">{product.text}</p>
-                        <p className="text-xs text-muted-foreground">{product.category}</p>
-                      </div>
-                    </Button>
-                  ))}
-                </div>
-              </Card>
-            </div>
-          </TabsContent>
-        </Tabs>
+                <Card className="p-4">
+                  <h3 className="font-semibold mb-4">Financial Products</h3>
+                  <div className="space-y-2">
+                    {productSuites.map((product, index) => (
+                      <Button
+                        key={index}
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left",
+                          selectedProduct?.text === product.text && "bg-accent"
+                        )}
+                        onClick={() => handleProductClick(product)}
+                      >
+                        <product.icon className="w-4 h-4 mr-2" />
+                        <div>
+                          <p className="text-sm font-medium">{product.text}</p>
+                          <p className="text-xs text-muted-foreground">{product.category}</p>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                </Card>
+              </div>
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <Card className="p-8 text-center">
+            <h2 className="text-xl font-semibold mb-4">Welcome to AI Financial Advisor</h2>
+            <p className="text-muted-foreground">Please select a customer to continue.</p>
+          </Card>
+        )}
       </div>
     </div>
   );
