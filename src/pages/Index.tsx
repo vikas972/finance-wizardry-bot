@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChatMessage } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
 import { FinancialMetrics } from "@/components/FinancialMetrics";
@@ -24,6 +24,7 @@ interface Message {
   text: string;
   isAi: boolean;
   timestamp: string;
+  isLoading?: boolean;
 }
 
 interface ChatResponse {
@@ -138,6 +139,21 @@ const Index = () => {
   const [selectedProduct, setSelectedProduct] = useState<ProductSuite | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  
+  // Add ref for chat container
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Function to scroll to bottom
+  const scrollToBottom = () => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  };
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   // Reset chat when customer changes
   const handleCustomerChange = (customerId: number) => {
@@ -232,19 +248,28 @@ const Index = () => {
       isAi: false,
       timestamp: new Date().toLocaleTimeString(),
     };
-    setMessages(prev => [...prev, userMessage]);
+    
+    // Add loading message
+    const loadingMessage = {
+      text: "",
+      isAi: true,
+      timestamp: new Date().toLocaleTimeString(),
+      isLoading: true
+    };
+    
+    setMessages(prev => [...prev, userMessage, loadingMessage]);
 
     // Get AI response
     const aiResponse = await callChatAPI(message);
     
-    // Add AI response
+    // Replace loading message with actual response
     const aiMessage = {
       text: aiResponse,
       isAi: true,
       timestamp: new Date().toLocaleTimeString(),
     };
-    setMessages(prev => [...prev, aiMessage]);
     
+    setMessages(prev => prev.slice(0, -1).concat(aiMessage));
     setIsLoading(false);
   };
 
@@ -294,13 +319,14 @@ const Index = () => {
             <TabsContent value="chat">
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 <Card className="lg:col-span-3 overflow-hidden flex flex-col h-[600px]">
-                  <div className="flex-1 overflow-y-auto">
+                  <div className="flex-1 overflow-y-auto" ref={chatContainerRef}>
                     {messages.map((message, index) => (
                       <ChatMessage
                         key={index}
                         message={message.text}
                         isAi={message.isAi}
                         timestamp={message.timestamp}
+                        isLoading={message.isLoading}
                       />
                     ))}
                   </div>
