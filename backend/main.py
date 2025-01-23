@@ -246,82 +246,96 @@ async def chat_with_customer_data(
         if not customer:
             raise HTTPException(status_code=404, detail="Customer not found")
         
-        # Prepare financial context with markdown formatting
-        financial_context = {
-            "customer_info": {
-                "name": customer.name,
-                "email": customer.email
-            }
-        }
+        # Get all relevant financial data
+        latest_aa = customer.aa_data[-1] if customer.aa_data else None
+        latest_bureau = customer.bureau_data[-1] if customer.bureau_data else None
+        latest_itr = customer.itr_data[-1] if customer.itr_data else None
+        loan_metrics = customer.loan_eligibility_metrics
+        credit_preferences = customer.credit_card_preferences
+        recent_transactions = customer.transactions[-5:] if customer.transactions else []  # Last 5 transactions
+
+        # Prepare comprehensive financial context with markdown formatting
+        context_markdown = "## Customer Financial Profile\n\n"
         
-        context_markdown = "## Financial Information\n\n"
+        # Basic Info
+        context_markdown += f"### Basic Information\n"
+        context_markdown += f"- Name: {customer.name}\n"
         
-        # Add AA data if available
-        if customer.aa_data:
-            latest_aa = customer.aa_data[-1]
-            financial_context["account_info"] = {
-                "account_summary": latest_aa.account_summary,
-                "spending_patterns": latest_aa.spending_patterns,
-                "assets": latest_aa.assets
-            }
-            context_markdown += "### Account Information\n"
-            if latest_aa.account_summary.get("savings_account"):
-                context_markdown += f"- **Current Balance**: ₹{latest_aa.account_summary['savings_account'].get('balance', 0):,.2f}\n"
-            if latest_aa.spending_patterns:
-                context_markdown += "#### Monthly Spending\n"
-                for category, amount in latest_aa.spending_patterns.get("categories", {}).items():
-                    context_markdown += f"- {category.title()}: ₹{amount:,.2f}\n"
-        
-        # Add bureau data if available
-        if customer.bureau_data:
-            latest_bureau = customer.bureau_data[-1]
-            financial_context["credit_info"] = {
-                "credit_score": latest_bureau.credit_score,
-                "loan_details": latest_bureau.loan_details,
-                "repayment_history": latest_bureau.repayment_history
-            }
-            context_markdown += "\n### Credit Information\n"
-            context_markdown += f"- **Credit Score**: {latest_bureau.credit_score}\n"
+        # Credit and Loan Information
+        if latest_bureau:
+            context_markdown += f"\n### Credit Profile\n"
+            context_markdown += f"- Credit Score: **{latest_bureau.credit_score}**\n"
             if latest_bureau.loan_details:
                 context_markdown += "#### Active Loans\n"
                 for loan_type, details in latest_bureau.loan_details.items():
-                    context_markdown += f"**{loan_type.replace('_', ' ').title()}**:\n"
-                    context_markdown += f"- Principal: ₹{details.get('principal', 0):,.2f}\n"
-                    context_markdown += f"- Interest Rate: {details.get('interest_rate', 0)}%\n"
-                    context_markdown += f"- Monthly EMI: ₹{details.get('monthly_emi', 0):,.2f}\n\n"
-        
-        # Add ITR data if available
-        if customer.itr_data:
-            latest_itr = customer.itr_data[-1]
-            financial_context["tax_info"] = {
-                "taxable_income": latest_itr.taxable_income,
-                "tax_returns": latest_itr.tax_returns,
-                "deductions": latest_itr.deductions
-            }
-            context_markdown += "\n### Tax Information\n"
-            context_markdown += f"- **Annual Income**: ₹{latest_itr.taxable_income:,.2f}\n"
+                    context_markdown += f"- {loan_type.replace('_', ' ').title()}:\n"
+                    context_markdown += f"  * Principal: ₹{details.get('principal', 0):,.2f}\n"
+                    context_markdown += f"  * Remaining: ₹{details.get('remaining', 0):,.2f}\n"
+                    context_markdown += f"  * EMI: ₹{details.get('monthly_emi', 0):,.2f}\n"
+
+        # Income and Tax Information
+        if latest_itr:
+            context_markdown += f"\n### Income Details\n"
+            context_markdown += f"- Annual Income: ₹{latest_itr.taxable_income:,.2f}\n"
+            context_markdown += f"- Monthly Income: ₹{latest_itr.taxable_income/12:,.2f}\n"
             if latest_itr.deductions:
                 context_markdown += "#### Tax Deductions\n"
                 for deduction_type, amount in latest_itr.deductions.items():
                     context_markdown += f"- {deduction_type}: ₹{amount:,.2f}\n"
+
+        # Account and Spending Information
+        if latest_aa:
+            context_markdown += f"\n### Banking Details\n"
+            if latest_aa.account_summary.get("savings_account"):
+                context_markdown += f"- Current Balance: ₹{latest_aa.account_summary['savings_account'].get('balance', 0):,.2f}\n"
+                context_markdown += f"- Monthly Average: ₹{latest_aa.account_summary['savings_account'].get('monthly_average', 0):,.2f}\n"
+            
+            if latest_aa.spending_patterns:
+                context_markdown += "\n#### Monthly Spending Patterns\n"
+                for category, amount in latest_aa.spending_patterns.get("categories", {}).items():
+                    context_markdown += f"- {category.title()}: ₹{amount:,.2f}\n"
+
+        # Loan Eligibility Metrics
+        if loan_metrics:
+            context_markdown += f"\n### Loan Eligibility Status\n"
+            context_markdown += f"- Eligibility Score: **{loan_metrics.eligibility_score}** ({loan_metrics.score_range})\n"
+            context_markdown += f"- Debt-to-Income Ratio: {loan_metrics.debt_to_income_ratio:.1f}% ({loan_metrics.dti_status})\n"
+            context_markdown += f"- Current EMI Load: ₹{loan_metrics.current_emi_load:,.2f} ({loan_metrics.emi_status})\n"
+
+        # Recent Transactions
+        if recent_transactions:
+            context_markdown += f"\n### Recent Transactions\n"
+            for tx in recent_transactions:
+                context_markdown += f"- {tx.description}: ₹{tx.amount:,.2f}\n"
+
+        # Credit Card Preferences
+        if credit_preferences:
+            context_markdown += f"\n### Credit Card Preferences\n"
+            context_markdown += f"- Preferred Categories: {', '.join(credit_preferences.preferred_categories)}\n"
+            context_markdown += f"- Max Annual Fee: ₹{credit_preferences.max_annual_fee:,.2f}\n"
+            context_markdown += f"- Reward Type: {credit_preferences.preferred_reward_type}\n"
+            context_markdown += f"- Travel Frequency: {credit_preferences.travel_frequency}\n"
         
-        # Prepare messages for OpenAI with markdown formatting instruction
-        system_message = """You are a financial advisor assistant. Analyze the provided financial data and answer questions.
-        Format your responses using markdown for better readability:
-        - Use ### for main sections
-        - Use bullet points (- ) for lists
-        - Use **bold** for important numbers and key points
-        - Use ₹ symbol for Indian Rupee amounts
-        - Format large numbers with commas for readability
-        - Use tables where appropriate using markdown syntax
+        # Prepare system message with instructions
+        system_message = """You are an AI financial advisor with access to the customer's comprehensive financial data. 
+        When answering questions:
+        1. Always reference specific numbers and data points from the customer's profile
+        2. Provide personalized advice based on their actual financial situation
+        3. Consider their credit score, income, spending patterns, and existing obligations
+        4. Format responses using markdown for better readability
+        5. Use ₹ symbol for Indian Rupee amounts
+        6. Format large numbers with commas
+        7. Use bullet points for lists
+        8. Bold important numbers and conclusions
         
-        Only use the information available in the context. If you don't have certain information, say so.
-        Be specific and reference actual numbers from the data when available."""
-        
+        If you don't have certain information in the context, acknowledge that limitation in your response."""
+
+        # Prepare messages for OpenAI
         messages = [
             {"role": "system", "content": system_message},
-            *conversation_history,
-            {"role": "user", "content": f"{context_markdown}\n\nQuestion: {query}"}
+            {"role": "user", "content": f"Customer Financial Context:\n{context_markdown}\n\nPrevious Conversation:\n"},
+            *conversation_history[-4:],  # Include last 4 messages for context
+            {"role": "user", "content": query}
         ]
         
         # Call OpenAI API
@@ -333,12 +347,20 @@ async def chat_with_customer_data(
                 temperature=0.3
             )
             
-            ai_response = response["choices"][0]["message"]["content"]
+            ai_response = response.choices[0].message.content
             
             return {
                 "query": query,
                 "response": ai_response,
-                "financial_context": financial_context
+                "financial_context": {
+                    "credit_score": latest_bureau.credit_score if latest_bureau else None,
+                    "monthly_income": latest_itr.taxable_income/12 if latest_itr else None,
+                    "current_balance": latest_aa.account_summary.get("savings_account", {}).get("balance") if latest_aa else None,
+                    "loan_eligibility": {
+                        "score": loan_metrics.eligibility_score if loan_metrics else None,
+                        "status": loan_metrics.score_range if loan_metrics else None
+                    } if loan_metrics else None
+                }
             }
             
         except Exception as e:
@@ -393,3 +415,132 @@ def get_loan_eligibility(customer_id: int, db: Session = Depends(get_db)):
         "current_emi_load": metrics.current_emi_load,
         "emi_status": metrics.emi_status
     } 
+
+@app.get("/credit-cards/")
+def get_credit_cards(db: Session = Depends(get_db)):
+    """Get all available credit cards"""
+    cards = db.query(models.CreditCard).all()
+    return cards
+
+@app.get("/customers/{customer_id}/credit-card-preferences")
+def get_customer_credit_card_preferences(customer_id: int, db: Session = Depends(get_db)):
+    """Get customer's credit card preferences"""
+    preferences = db.query(models.CustomerCreditCardPreference).filter(
+        models.CustomerCreditCardPreference.customer_id == customer_id
+    ).first()
+    if not preferences:
+        raise HTTPException(status_code=404, detail="Credit card preferences not found")
+    return preferences
+
+@app.post("/customers/{customer_id}/credit-card-preferences")
+def update_credit_card_preferences(
+    customer_id: int,
+    preferences: dict,
+    db: Session = Depends(get_db)
+):
+    """Update customer's credit card preferences"""
+    existing_preferences = db.query(models.CustomerCreditCardPreference).filter(
+        models.CustomerCreditCardPreference.customer_id == customer_id
+    ).first()
+
+    if existing_preferences:
+        for key, value in preferences.items():
+            setattr(existing_preferences, key, value)
+    else:
+        preferences["customer_id"] = customer_id
+        new_preferences = models.CustomerCreditCardPreference(**preferences)
+        db.add(new_preferences)
+
+    db.commit()
+    return {"message": "Preferences updated successfully"}
+
+@app.post("/customers/{customer_id}/recommend-credit-cards")
+async def recommend_credit_cards(customer_id: int, db: Session = Depends(get_db)):
+    """Get personalized credit card recommendations"""
+    # Get customer data
+    customer = db.query(models.Customer).filter(models.Customer.id == customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    # Get customer's financial data
+    bureau_data = customer.bureau_data[-1] if customer.bureau_data else None
+    itr_data = customer.itr_data[-1] if customer.itr_data else None
+    preferences = customer.credit_card_preferences
+
+    if not all([bureau_data, itr_data, preferences]):
+        raise HTTPException(
+            status_code=400,
+            detail="Insufficient data for recommendations"
+        )
+
+    # Get all credit cards
+    credit_cards = db.query(models.CreditCard).all()
+
+    # Prepare context for GPT-4
+    context = f"""
+    Customer Profile:
+    - Monthly Income: ₹{itr_data.taxable_income / 12:,.2f}
+    - Credit Score: {bureau_data.credit_score}
+    - Preferred Categories: {preferences.preferred_categories}
+    - Maximum Annual Fee: ₹{preferences.max_annual_fee:,.2f}
+    - Preferred Reward Type: {preferences.preferred_reward_type}
+    - Travel Frequency: {preferences.travel_frequency}
+    - Current Cards: {preferences.current_cards}
+    - Monthly Spending Patterns: {preferences.monthly_spending}
+
+    Available Credit Cards:
+    """
+    
+    for card in credit_cards:
+        context += f"""
+        {card.bank_name} {card.card_name}:
+        - Type: {card.card_type}
+        - Annual Fee: ₹{card.annual_fee}
+        - Min Income Required: ₹{card.min_income}
+        - Min Credit Score: {card.min_credit_score}
+        - Key Benefits:
+          * Welcome: {card.welcome_benefits}
+          * Rewards: {card.reward_points}
+          * Cashback: {card.cashback_details}
+          * Travel: {card.travel_benefits}
+          * Lifestyle: {card.lifestyle_benefits}
+        """
+
+    # Prepare prompt for GPT-4
+    prompt = """You are a credit card recommendation expert. Based on the customer's profile and preferences, 
+    analyze the available credit cards and recommend the best options. Consider:
+    1. Eligibility (income and credit score requirements)
+    2. Match with spending patterns and lifestyle preferences
+    3. Value for money (benefits vs annual fee)
+    4. Complementary benefits to existing cards
+
+    Provide a ranked list of top 3 recommended cards with detailed justification for each recommendation.
+    Format your response in markdown with clear sections and bullet points."""
+
+    try:
+        response = openai.ChatCompletion.create(
+            engine="gpt4o",
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": f"Context:\n{context}\n\nProvide credit card recommendations for this customer."}
+            ],
+            max_tokens=4096,
+            temperature=0.3
+        )
+
+        recommendations = response.choices[0].message.content
+
+        return {
+            "customer_profile": {
+                "monthly_income": itr_data.taxable_income / 12,
+                "credit_score": bureau_data.credit_score,
+                "preferences": preferences
+            },
+            "recommendations": recommendations
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating recommendations: {str(e)}"
+        ) 
