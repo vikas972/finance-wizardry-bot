@@ -19,6 +19,7 @@ import {
   Landmark
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CreditCardDashboard } from "@/components/CreditCardDashboard";
 
 interface Message {
   text: string;
@@ -78,6 +79,22 @@ const productSuites: ProductSuite[] = [
   },
   {
     icon: CreditCard,
+    text: "Credit Cards",
+    category: "Card Services",
+    description: "Discover the perfect credit card for your lifestyle",
+    recommendedQueries: [
+      "What credit cards would you recommend for me?",
+      "Show me the best travel credit cards",
+      "Which cards offer maximum cashback?",
+      "Compare premium credit cards",
+      "Credit cards with lowest annual fees",
+      "Show me cards with best reward points",
+      "Which cards have good welcome benefits?",
+      "Cards with best dining privileges"
+    ]
+  },
+  {
+    icon: PiggyBank,
     text: "Personal Banking",
     category: "Retail Banking",
     description: "Day-to-day banking and credit solutions",
@@ -190,56 +207,53 @@ const Index = () => {
     fetchCustomers();
   }, []);
 
-  const callChatAPI = async (userMessage: string) => {
-    if (!selectedCustomerId) {
-      return "Please select a customer first.";
-    }
-
+  const callChatAPI = async (message: string, customerId: number) => {
     try {
-      // First, ensure we have fresh customer data
-      const response = await fetch(`${API_URL}/customers/${selectedCustomerId}/chat/`, {
+      const response = await fetch(`http://localhost:3000/customers/${customerId}/chat/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
         },
         body: JSON.stringify({
-          query: userMessage,
-          conversation_history: [
-            // Only include the last few messages for context, but not too many to avoid confusion
-            ...conversationHistory.slice(-4).map(msg => ({
-              role: msg.role,
-              content: msg.content
-            })),
-            { role: "user", content: userMessage }
-          ]
+          query: message,
+          conversation_history: []  // You can add conversation history if needed
         })
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('API Error:', errorData);
-        throw new Error(errorData.detail || 'API call failed');
+        throw new Error('Network response was not ok');
       }
 
-      const data: ChatResponse = await response.json();
+      const data = await response.json();
       
-      // Update conversation history with only the latest exchange
-      const newHistory = [
-        ...conversationHistory.slice(-4), // Keep only last 4 messages for context
-        { role: "user", content: userMessage },
-        { role: "assistant", content: data.response }
-      ];
-      setConversationHistory(newHistory);
+      // Check if the response contains credit card recommendations
+      if (data.response && (
+        message.toLowerCase().includes('credit card') ||
+        message.toLowerCase().includes('card recommendation') ||
+        data.response.toLowerCase().includes('credit card') ||
+        data.response.toLowerCase().includes('recommend')
+      )) {
+        // Store the recommendation in localStorage
+        localStorage.setItem(`chatRecommendation_${customerId}`, data.response);
+        
+        // Trigger a refresh of the credit card dashboard if it's mounted
+        window.dispatchEvent(new CustomEvent('creditCardRecommendationUpdate', {
+          detail: { recommendation: data.response }
+        }));
+      }
 
       return data.response;
     } catch (error) {
       console.error('Error calling chat API:', error);
-      return "I apologize, but I'm having trouble accessing the financial data right now. Please try again in a moment.";
+      return 'Sorry, I encountered an error processing your request.';
     }
   };
 
   const handleSendMessage = async (message: string) => {
+    if (!selectedCustomerId) {
+      return;
+    }
+
     setIsLoading(true);
     
     // Add user message
@@ -260,7 +274,7 @@ const Index = () => {
     setMessages(prev => [...prev, userMessage, loadingMessage]);
 
     // Get AI response
-    const aiResponse = await callChatAPI(message);
+    const aiResponse = await callChatAPI(message, selectedCustomerId);
     
     // Replace loading message with actual response
     const aiMessage = {
@@ -300,10 +314,14 @@ const Index = () => {
 
         {selectedCustomerId ? (
           <Tabs defaultValue="dashboard" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-8">
+            <TabsList className="grid w-full grid-cols-3 mb-8">
               <TabsTrigger value="dashboard" className="flex items-center gap-2">
                 <LayoutDashboard className="w-4 h-4" />
                 Dashboard
+              </TabsTrigger>
+              <TabsTrigger value="credit-cards" className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4" />
+                Credit Cards
               </TabsTrigger>
               <TabsTrigger value="chat" className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4" />
@@ -314,6 +332,10 @@ const Index = () => {
             <TabsContent value="dashboard" className="space-y-8">
               <FinancialMetrics customerId={selectedCustomerId!} />
               <FinancialCharts />
+            </TabsContent>
+
+            <TabsContent value="credit-cards" className="space-y-8">
+              <CreditCardDashboard customerId={selectedCustomerId!} />
             </TabsContent>
 
             <TabsContent value="chat">

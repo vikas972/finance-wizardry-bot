@@ -9,6 +9,10 @@ class Customer(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     email = Column(String, unique=True, index=True)
+    age = Column(Integer)
+    occupation = Column(String)
+    interests = Column(ARRAY(String))  # Store interests as array of strings
+    lifestyle_preferences = Column(JSON)  # Store detailed preferences
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     transactions = relationship("Transaction", back_populates="customer")
     aa_data = relationship("AAData", back_populates="customer")
@@ -116,4 +120,19 @@ class CustomerCreditCardPreference(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    customer = relationship("Customer", back_populates="credit_card_preferences") 
+    customer = relationship("Customer", back_populates="credit_card_preferences")
+
+class CreditCardUpdate(Base):
+    __tablename__ = "credit_card_updates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    card_id = Column(Integer, ForeignKey("credit_cards.id"))
+    update_type = Column(String)  # 'feature_update', 'offer', 'promotion'
+    title = Column(String)
+    description = Column(Text)
+    valid_from = Column(DateTime(timezone=True))
+    valid_until = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    is_active = Column(Boolean, default=True)
+
+    credit_card = relationship("CreditCard", backref="updates") 

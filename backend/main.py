@@ -9,6 +9,7 @@ from rag_utils import RAGPipeline
 import openai
 import json
 from pydantic import BaseModel
+from datetime import datetime
 
 # OpenAI Azure Configuration
 openai.api_type = "azure"
@@ -255,11 +256,19 @@ async def chat_with_customer_data(
         recent_transactions = customer.transactions[-5:] if customer.transactions else []  # Last 5 transactions
 
         # Prepare comprehensive financial context with markdown formatting
-        context_markdown = "## Customer Financial Profile\n\n"
+        context_markdown = "## Customer Profile\n\n"
         
-        # Basic Info
-        context_markdown += f"### Basic Information\n"
+        # Basic Info and Demographics
+        context_markdown += f"### Personal Information\n"
         context_markdown += f"- Name: {customer.name}\n"
+        context_markdown += f"- Age: {customer.age}\n"
+        context_markdown += f"- Occupation: {customer.occupation}\n"
+        if customer.interests:
+            context_markdown += f"- Interests: {', '.join(customer.interests)}\n"
+        if customer.lifestyle_preferences:
+            context_markdown += "\n#### Lifestyle Preferences\n"
+            for category, preference in customer.lifestyle_preferences.items():
+                context_markdown += f"- {category.replace('_', ' ').title()}: {preference}\n"
         
         # Credit and Loan Information
         if latest_bureau:
@@ -302,12 +311,6 @@ async def chat_with_customer_data(
             context_markdown += f"- Debt-to-Income Ratio: {loan_metrics.debt_to_income_ratio:.1f}% ({loan_metrics.dti_status})\n"
             context_markdown += f"- Current EMI Load: ₹{loan_metrics.current_emi_load:,.2f} ({loan_metrics.emi_status})\n"
 
-        # Recent Transactions
-        if recent_transactions:
-            context_markdown += f"\n### Recent Transactions\n"
-            for tx in recent_transactions:
-                context_markdown += f"- {tx.description}: ₹{tx.amount:,.2f}\n"
-
         # Credit Card Preferences
         if credit_preferences:
             context_markdown += f"\n### Credit Card Preferences\n"
@@ -319,14 +322,21 @@ async def chat_with_customer_data(
         # Prepare system message with instructions
         system_message = """You are an AI financial advisor with access to the customer's comprehensive financial data. 
         When answering questions:
-        1. Always reference specific numbers and data points from the customer's profile
-        2. Provide personalized advice based on their actual financial situation
-        3. Consider their credit score, income, spending patterns, and existing obligations
-        4. Format responses using markdown for better readability
-        5. Use ₹ symbol for Indian Rupee amounts
-        6. Format large numbers with commas
-        7. Use bullet points for lists
-        8. Bold important numbers and conclusions
+        1. Consider the customer's age, occupation, and interests for personalized recommendations
+        2. Factor in their lifestyle preferences and spending patterns
+        3. Always reference specific numbers and data points from their profile
+        4. Provide personalized advice based on their actual financial situation
+        5. Consider their credit score, income, spending patterns, and existing obligations
+        6. For credit card recommendations:
+           - Match cards to their interests (travel/dining/shopping)
+           - Consider their spending patterns and reward preferences
+           - Factor in their age and lifestyle for relevant perks
+           - Ensure recommendations align with their credit score and income
+        7. Format responses using markdown for better readability
+        8. Use ₹ symbol for Indian Rupee amounts
+        9. Format large numbers with commas
+        10. Use bullet points for lists
+        11. Bold important numbers and conclusions
         
         If you don't have certain information in the context, acknowledge that limitation in your response."""
 
@@ -356,6 +366,12 @@ async def chat_with_customer_data(
                     "credit_score": latest_bureau.credit_score if latest_bureau else None,
                     "monthly_income": latest_itr.taxable_income/12 if latest_itr else None,
                     "current_balance": latest_aa.account_summary.get("savings_account", {}).get("balance") if latest_aa else None,
+                    "demographics": {
+                        "age": customer.age,
+                        "occupation": customer.occupation,
+                        "interests": customer.interests,
+                        "lifestyle_preferences": customer.lifestyle_preferences
+                    } if customer else None,
                     "loan_eligibility": {
                         "score": loan_metrics.eligibility_score if loan_metrics else None,
                         "status": loan_metrics.score_range if loan_metrics else None
@@ -544,3 +560,73 @@ async def recommend_credit_cards(customer_id: int, db: Session = Depends(get_db)
             status_code=500,
             detail=f"Error generating recommendations: {str(e)}"
         ) 
+
+@app.get("/credit-cards/updates")
+def get_credit_card_updates(db: Session = Depends(get_db)):
+    """Get all active credit card updates and offers"""
+    current_time = datetime.now()
+    updates = db.query(models.CreditCardUpdate).filter(
+        models.CreditCardUpdate.is_active == True,
+        models.CreditCardUpdate.valid_from <= current_time,
+        models.CreditCardUpdate.valid_until >= current_time
+    ).all()
+    
+    # Group updates by card
+    grouped_updates = {}
+    for update in updates:
+        if update.card_id not in grouped_updates:
+            grouped_updates[update.card_id] = {
+                "card": {
+                    "bank_name": update.credit_card.bank_name,
+                    "card_name": update.credit_card.card_name,
+                },
+                "updates": []
+            }
+        grouped_updates[update.card_id]["updates"].append({
+            "id": update.id,
+            "type": update.update_type,
+            "title": update.title,
+            "description": update.description,
+            "valid_until": update.valid_until.isoformat()
+        })
+    
+    return grouped_updates
+
+@app.get("/credit-cards/{card_id}/updates")
+def get_card_updates(card_id: int, db: Session = Depends(get_db)):
+    """Get updates for a specific credit card"""
+    current_time = datetime.now()
+    updates = db.query(models.CreditCardUpdate).filter(
+        models.CreditCardUpdate.card_id == card_id,
+        models.CreditCardUpdate.is_active == True,
+        models.CreditCardUpdate.valid_from <= current_time,
+        models.CreditCardUpdate.valid_until >= current_time
+    ).all()
+    
+    return [
+        {
+            "id": update.id,
+            "type": update.update_type,
+            "title": update.title,
+            "description": update.description,
+            "valid_from": update.valid_from.isoformat(),
+            "valid_until": update.valid_until.isoformat()
+        }
+        for update in updates
+    ]
+
+@app.post("/credit-cards/{card_id}/updates")
+def create_card_update(
+    card_id: int,
+    update: dict,
+    db: Session = Depends(get_db)
+):
+    """Create a new update or offer for a credit card"""
+    db_update = models.CreditCardUpdate(
+        card_id=card_id,
+        **update
+    )
+    db.add(db_update)
+    db.commit()
+    db.refresh(db_update)
+    return db_update 

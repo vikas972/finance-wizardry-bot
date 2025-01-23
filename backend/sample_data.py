@@ -1,6 +1,11 @@
 from database import SessionLocal
 import models
 import json
+from datetime import datetime, timedelta
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from models import Base, Customer
+from database import SQLALCHEMY_DATABASE_URL
 
 def calculate_loan_eligibility_metrics(customer_data, bureau_data):
     # Use the exact same credit score from bureau_data
@@ -257,5 +262,107 @@ def create_sample_data():
     print("Sample data created successfully!")
     db.close()
 
+# Create database engine and session
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+Base.metadata.create_all(bind=engine)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Sample demographic data
+customer_demographics = [
+    {
+        "email": "rahul.sharma@gmail.com",
+        "age": 32,
+        "occupation": "Software Engineer",
+        "interests": ["technology", "travel", "dining"],
+        "lifestyle_preferences": {
+            "dining_frequency": "frequent",
+            "travel_frequency": "moderate",
+            "shopping_preference": "online",
+            "entertainment": "movies_and_events",
+            "fitness": "gym_enthusiast"
+        }
+    },
+    {
+        "email": "priya.patel@yahoo.com",
+        "age": 28,
+        "occupation": "Marketing Manager",
+        "interests": ["shopping", "dining", "fashion"],
+        "lifestyle_preferences": {
+            "dining_frequency": "moderate",
+            "travel_frequency": "occasional",
+            "shopping_preference": "luxury_retail",
+            "entertainment": "fine_dining",
+            "fitness": "yoga"
+        }
+    },
+    {
+        "email": "amit.kumar@outlook.com",
+        "age": 45,
+        "occupation": "Business Owner",
+        "interests": ["business", "golf", "luxury_travel"],
+        "lifestyle_preferences": {
+            "dining_frequency": "frequent",
+            "travel_frequency": "frequent",
+            "shopping_preference": "premium_brands",
+            "entertainment": "golf_and_clubs",
+            "fitness": "personal_trainer"
+        }
+    },
+    {
+        "email": "sneha.reddy@hotmail.com",
+        "age": 35,
+        "occupation": "Doctor",
+        "interests": ["health", "travel", "books"],
+        "lifestyle_preferences": {
+            "dining_frequency": "moderate",
+            "travel_frequency": "frequent",
+            "shopping_preference": "quality_focused",
+            "entertainment": "cultural_events",
+            "fitness": "running"
+        }
+    },
+    {
+        "email": "vikram.singh@gmail.com",
+        "age": 29,
+        "occupation": "Financial Analyst",
+        "interests": ["finance", "fitness", "technology"],
+        "lifestyle_preferences": {
+            "dining_frequency": "moderate",
+            "travel_frequency": "occasional",
+            "shopping_preference": "value_focused",
+            "entertainment": "sports",
+            "fitness": "crossfit"
+        }
+    }
+]
+
+def update_customer_demographics():
+    """Update existing customers with demographic information"""
+    db = SessionLocal()
+    try:
+        print("Updating customer demographics...")
+        
+        for demo_data in customer_demographics:
+            # Find existing customer by email
+            customer = db.query(Customer).filter(Customer.email == demo_data["email"]).first()
+            if customer:
+                print(f"Updating demographics for {demo_data['email']}")
+                customer.age = demo_data["age"]
+                customer.occupation = demo_data["occupation"]
+                customer.interests = demo_data["interests"]
+                customer.lifestyle_preferences = demo_data["lifestyle_preferences"]
+            else:
+                print(f"Customer not found: {demo_data['email']}")
+        
+        db.commit()
+        print("Demographics update completed successfully!")
+        
+    except Exception as e:
+        print(f"Error updating demographics: {str(e)}")
+        db.rollback()
+    finally:
+        db.close()
+
 if __name__ == "__main__":
-    create_sample_data() 
+    create_sample_data()
+    update_customer_demographics() 
