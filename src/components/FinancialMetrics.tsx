@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { ArrowUpRight, TrendingUp, CreditCard, Wallet, PiggyBank, AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { config } from "@/config";
 
 interface LoanEligibilityMetrics {
   eligibility_score: number;
@@ -23,7 +24,7 @@ export const FinancialMetrics = ({ customerId }: FinancialMetricsProps) => {
     const fetchMetrics = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`http://localhost:3000/customers/${customerId}/loan-eligibility`);
+        const response = await fetch(`${config.apiUrl}/customers/${customerId}/loan-eligibility`);
         if (response.ok) {
           const data = await response.json();
           setMetrics(data);

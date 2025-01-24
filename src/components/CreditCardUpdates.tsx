@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Bell, Gift, AlertCircle } from "lucide-react";
+import { config } from "@/config";
 
 interface CardInfo {
   bank_name: string;
@@ -33,7 +34,7 @@ export function CreditCardUpdates() {
 
   const fetchUpdates = async () => {
     try {
-      const response = await fetch('http://localhost:3000/credit-cards/updates');
+      const response = await fetch(`${config.apiUrl}/credit-cards/updates`);
       if (response.ok) {
         const data = await response.json();
         setGroupedUpdates(data);

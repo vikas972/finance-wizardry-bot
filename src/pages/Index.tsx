@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CreditCardDashboard } from "@/components/CreditCardDashboard";
+import { config } from "@/config";
 
 interface Message {
   text: string;
@@ -191,7 +192,7 @@ const Index = () => {
   useEffect(() => {
     const fetchCustomers = async () => {
       try {
-        const response = await fetch(`${API_URL}/customers/`);
+        const response = await fetch(`${config.apiUrl}/customers/`);
         if (response.ok) {
           const data = await response.json();
           setCustomers(data);
@@ -209,14 +210,14 @@ const Index = () => {
 
   const callChatAPI = async (message: string, customerId: number) => {
     try {
-      const response = await fetch(`http://localhost:3000/customers/${customerId}/chat/`, {
+      const response = await fetch(`${config.apiUrl}/customers/${customerId}/chat/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           query: message,
-          conversation_history: []  // You can add conversation history if needed
+          conversation_history: []
         })
       });
 
@@ -233,10 +234,7 @@ const Index = () => {
         data.response.toLowerCase().includes('credit card') ||
         data.response.toLowerCase().includes('recommend')
       )) {
-        // Store the recommendation in localStorage
         localStorage.setItem(`chatRecommendation_${customerId}`, data.response);
-        
-        // Trigger a refresh of the credit card dashboard if it's mounted
         window.dispatchEvent(new CustomEvent('creditCardRecommendationUpdate', {
           detail: { recommendation: data.response }
         }));

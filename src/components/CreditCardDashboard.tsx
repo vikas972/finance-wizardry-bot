@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreditCard, PiggyBank, Plane, Gift, AlertCircle } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import { CreditCardUpdates } from "./CreditCardUpdates";
+import { config } from "@/config";
 
 interface CreditCardOffer {
   id: number;
@@ -65,7 +66,7 @@ export function CreditCardDashboard({ customerId }: CreditCardDashboardProps) {
 
   const fetchRecommendations = async () => {
     try {
-      const response = await fetch(`http://localhost:3000/customers/${customerId}/recommend-credit-cards`, {
+      const response = await fetch(`${config.apiUrl}/customers/${customerId}/recommend-credit-cards`, {
         method: 'POST'
       });
       if (response.ok) {
@@ -79,7 +80,7 @@ export function CreditCardDashboard({ customerId }: CreditCardDashboardProps) {
 
   const fetchAllCards = async () => {
     try {
-      const response = await fetch('http://localhost:3000/credit-cards/');
+      const response = await fetch(`${config.apiUrl}/credit-cards/`);
       if (response.ok) {
         const data = await response.json();
         setAllCards(data);
