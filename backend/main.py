@@ -6,16 +6,28 @@ import schemas
 from database import engine, get_db
 from fastapi.middleware.cors import CORSMiddleware
 from rag_utils import RAGPipeline
-import openai
+import openai  # Commented out OpenAI
 import json
 from pydantic import BaseModel
 from datetime import datetime
+import os
+from dotenv import load_dotenv
+from llm_utils import OllamaLLM
 
-# OpenAI Azure Configuration
-openai.api_type = "azure"
-openai.api_base = "https://eastusigtb.openai.azure.com/"
-openai.api_version = "2024-02-15-preview"
-openai.api_key = "34a93b9dd2bc45ef8d6f07e5ef92940e"
+# Load environment variables
+load_dotenv()
+
+# Comment out OpenAI configuration
+openai.api_type = ""
+openai.api_base = ""
+openai.api_version = ""
+openai.api_key = ""
+
+# Initialize Ollama with the correct model name
+llm = OllamaLLM(
+    model_name="deepseek-r1:1.5b",  # Updated model name
+    base_url="http://localhost:11434"
+)
 
 models.Base.metadata.create_all(bind=engine)
 rag_pipeline = RAGPipeline()
@@ -253,7 +265,7 @@ async def chat_with_customer_data(
         latest_itr = customer.itr_data[-1] if customer.itr_data else None
         loan_metrics = customer.loan_eligibility_metrics
         credit_preferences = customer.credit_card_preferences
-        recent_transactions = customer.transactions[-5:] if customer.transactions else []  # Last 5 transactions
+        recent_transactions = customer.transactions[-5:] if customer.transactions else []
 
         # Prepare comprehensive financial context with markdown formatting
         context_markdown = "## Customer Profile\n\n"
@@ -336,28 +348,29 @@ async def chat_with_customer_data(
         8. Use ₹ symbol for Indian Rupee amounts
         9. Format large numbers with commas
         10. Use bullet points for lists
-        11. Bold important numbers and conclusions
-        
-        If you don't have certain information in the context, acknowledge that limitation in your response."""
+        11. Bold important numbers and conclusions"""
 
-        # Prepare messages for OpenAI
-        messages = [
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": f"Customer Financial Context:\n{context_markdown}\n\nPrevious Conversation:\n"},
-            *conversation_history[-4:],  # Include last 4 messages for context
-            {"role": "user", "content": query}
-        ]
+        # Prepare conversation context
+        conversation_context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation_history[-4:]])
         
-        # Call OpenAI API
+        # Combine all context
+        full_context = f"""
+        {context_markdown}
+        
+        Previous Conversation:
+        {conversation_context}
+        
+        Current Query: {query}
+        """
+        
+        # Generate response using Ollama
         try:
-            response = openai.ChatCompletion.create(
-                engine="gpt4o",
-                messages=messages,
-                max_tokens=4096,
-                temperature=0.3
+            ai_response = llm.generate_response(
+                prompt=full_context,
+                system_prompt=system_message,
+                temperature=0.3,
+                max_tokens=2048
             )
-            
-            ai_response = response.choices[0].message.content
             
             return {
                 "query": query,
@@ -380,7 +393,7 @@ async def chat_with_customer_data(
             }
             
         except Exception as e:
-            print(f"OpenAI API Error: {str(e)}")
+            print(f"LLM Error: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail="Error generating response from AI service"
@@ -492,7 +505,7 @@ async def recommend_credit_cards(customer_id: int, db: Session = Depends(get_db)
     # Get all credit cards
     credit_cards = db.query(models.CreditCard).all()
 
-    # Prepare context for GPT-4
+    # Prepare context for LLM
     context = f"""
     Customer Profile:
     - Monthly Income: ₹{itr_data.taxable_income / 12:,.2f}
@@ -522,8 +535,8 @@ async def recommend_credit_cards(customer_id: int, db: Session = Depends(get_db)
           * Lifestyle: {card.lifestyle_benefits}
         """
 
-    # Prepare prompt for GPT-4
-    prompt = """You are a credit card recommendation expert. Based on the customer's profile and preferences, 
+    # Prepare prompt for LLM
+    system_prompt = """You are a credit card recommendation expert. Based on the customer's profile and preferences, 
     analyze the available credit cards and recommend the best options. Consider:
     1. Eligibility (income and credit score requirements)
     2. Match with spending patterns and lifestyle preferences
@@ -534,17 +547,12 @@ async def recommend_credit_cards(customer_id: int, db: Session = Depends(get_db)
     Format your response in markdown with clear sections and bullet points."""
 
     try:
-        response = openai.ChatCompletion.create(
-            engine="gpt4o",
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": f"Context:\n{context}\n\nProvide credit card recommendations for this customer."}
-            ],
-            max_tokens=4096,
-            temperature=0.3
+        recommendations = llm.generate_response(
+            prompt=context,
+            system_prompt=system_prompt,
+            temperature=0.3,
+            max_tokens=2048
         )
-
-        recommendations = response.choices[0].message.content
 
         return {
             "customer_profile": {
@@ -559,7 +567,7 @@ async def recommend_credit_cards(customer_id: int, db: Session = Depends(get_db)
         raise HTTPException(
             status_code=500,
             detail=f"Error generating recommendations: {str(e)}"
-        ) 
+        )
 
 @app.get("/credit-cards/updates")
 def get_credit_card_updates(db: Session = Depends(get_db)):
