@@ -13,6 +13,9 @@ from datetime import datetime
 import os
 from dotenv import load_dotenv
 from llm_utils import OllamaLLM
+from news_intelligence import news_agent
+from typing import Optional
+import asyncio
 
 # Load environment variables
 load_dotenv()
@@ -637,4 +640,207 @@ def create_card_update(
     db.add(db_update)
     db.commit()
     db.refresh(db_update)
-    return db_update 
+    return db_update
+
+# News Intelligence API Endpoints
+@app.get("/news/")
+async def get_news_articles(
+    category: Optional[str] = None,
+    sentiment: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0,
+    db: Session = Depends(get_db)
+):
+    """Get news articles with optional filtering"""
+    query = db.query(models.NewsArticle).filter(models.NewsArticle.is_active == True)
+    
+    if category:
+        query = query.filter(models.NewsArticle.category == category)
+    
+    if sentiment:
+        query = query.filter(models.NewsArticle.sentiment_label == sentiment)
+    
+    # Order by impact score and published date
+    articles = query.order_by(
+        models.NewsArticle.impact_score.desc(),
+        models.NewsArticle.published_date.desc()
+    ).offset(offset).limit(limit).all()
+    
+    return [
+        {
+            "id": article.id,
+            "title": article.title,
+            "url": article.url,
+            "source": article.source,
+            "published_date": article.published_date.isoformat() if article.published_date else None,
+            "snippet": article.snippet,
+            "category": article.category,
+            "sentiment_score": article.sentiment_score,
+            "sentiment_label": article.sentiment_label,
+            "impact_score": article.impact_score,
+            "symbols": article.symbols,
+            "keywords": article.keywords,
+            "market_region": article.market_region
+        }
+        for article in articles
+    ]
+
+@app.get("/news/trending")
+async def get_trending_topics(db: Session = Depends(get_db)):
+    """Get trending topics based on recent news"""
+    # Get news from last 24 hours
+    from datetime import timedelta
+    cutoff_date = datetime.utcnow() - timedelta(hours=24)
+    
+    recent_articles = db.query(models.NewsArticle).filter(
+        models.NewsArticle.is_active == True,
+        models.NewsArticle.published_date >= cutoff_date
+    ).all()
+    
+    # Count keyword frequency
+    keyword_counts = {}
+    sentiment_by_keyword = {}
+    
+    for article in recent_articles:
+        if article.keywords:
+            for keyword in article.keywords:
+                keyword_counts[keyword] = keyword_counts.get(keyword, 0) + 1
+                if keyword not in sentiment_by_keyword:
+                    sentiment_by_keyword[keyword] = []
+                sentiment_by_keyword[keyword].append(article.sentiment_score or 0)
+    
+    # Calculate trending topics
+    trending = []
+    for keyword, count in sorted(keyword_counts.items(), key=lambda x: x[1], reverse=True)[:10]:
+        avg_sentiment = sum(sentiment_by_keyword[keyword]) / len(sentiment_by_keyword[keyword])
+        sentiment_label = "Bullish" if avg_sentiment > 0.1 else "Bearish" if avg_sentiment < -0.1 else "Neutral"
+        
+        trending.append({
+            "topic": keyword.title(),
+            "mentions": count,
+            "sentiment": sentiment_label,
+            "change": f"+{count * 5}%"  # Simplified change calculation
+        })
+    
+    return trending
+
+@app.get("/news/sentiment")
+async def get_market_sentiment(db: Session = Depends(get_db)):
+    """Get overall market sentiment analysis"""
+    from datetime import timedelta
+    cutoff_date = datetime.utcnow() - timedelta(hours=24)
+    
+    recent_articles = db.query(models.NewsArticle).filter(
+        models.NewsArticle.is_active == True,
+        models.NewsArticle.published_date >= cutoff_date
+    ).all()
+    
+    if not recent_articles:
+        return {"error": "No recent articles found"}
+    
+    # Calculate sentiment metrics
+    total_articles = len(recent_articles)
+    positive_count = sum(1 for article in recent_articles if article.sentiment_label == "positive")
+    negative_count = sum(1 for article in recent_articles if article.sentiment_label == "negative")
+    neutral_count = total_articles - positive_count - negative_count
+    
+    avg_sentiment = sum(article.sentiment_score or 0 for article in recent_articles) / total_articles
+    avg_impact = sum(article.impact_score or 0 for article in recent_articles) / total_articles
+    
+    return {
+        "overall_sentiment": "Positive" if avg_sentiment > 0.1 else "Negative" if avg_sentiment < -0.1 else "Neutral",
+        "sentiment_score": round(avg_sentiment, 3),
+        "total_articles": total_articles,
+        "sentiment_distribution": {
+            "positive": round(positive_count / total_articles * 100, 1),
+            "neutral": round(neutral_count / total_articles * 100, 1),
+            "negative": round(negative_count / total_articles * 100, 1)
+        },
+        "market_metrics": [
+            {
+                "metric": "Overall Sentiment",
+                "value": "Positive" if avg_sentiment > 0.1 else "Negative" if avg_sentiment < -0.1 else "Neutral",
+                "score": round((avg_sentiment + 1) * 50, 0)  # Convert -1 to 1 range to 0-100
+            },
+            {
+                "metric": "News Volume",
+                "value": "High" if total_articles > 50 else "Medium" if total_articles > 20 else "Low",
+                "score": min(total_articles * 2, 100)
+            },
+            {
+                "metric": "Market Impact",
+                "value": "High" if avg_impact > 0.6 else "Medium" if avg_impact > 0.3 else "Low",
+                "score": round(avg_impact * 100, 0)
+            }
+        ]
+    }
+
+@app.get("/news/categories")
+async def get_news_by_category(db: Session = Depends(get_db)):
+    """Get news articles grouped by category"""
+    from sqlalchemy import func
+    
+    # Get article counts by category
+    category_counts = db.query(
+        models.NewsArticle.category,
+        func.count(models.NewsArticle.id).label('count')
+    ).filter(
+        models.NewsArticle.is_active == True
+    ).group_by(models.NewsArticle.category).all()
+    
+    result = {}
+    for category, count in category_counts:
+        # Get recent articles for this category
+        articles = db.query(models.NewsArticle).filter(
+            models.NewsArticle.category == category,
+            models.NewsArticle.is_active == True
+        ).order_by(models.NewsArticle.published_date.desc()).limit(5).all()
+        
+        result[category] = {
+            "count": count,
+            "articles": [
+                {
+                    "id": article.id,
+                    "title": article.title,
+                    "source": article.source,
+                    "sentiment_label": article.sentiment_label,
+                    "impact_score": article.impact_score,
+                    "published_date": article.published_date.isoformat() if article.published_date else None
+                }
+                for article in articles
+            ]
+        }
+    
+    return result
+
+@app.post("/news/update")
+async def update_news_feed(db: Session = Depends(get_db)):
+    """Manually trigger news feed update"""
+    try:
+        result = await news_agent.update_news_feed(db)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating news feed: {str(e)}")
+
+@app.get("/news/symbols/{symbol}")
+async def get_news_by_symbol(symbol: str, db: Session = Depends(get_db)):
+    """Get news articles related to a specific stock symbol"""
+    articles = db.query(models.NewsArticle).filter(
+        models.NewsArticle.symbols.contains([symbol.upper()]),
+        models.NewsArticle.is_active == True
+    ).order_by(models.NewsArticle.published_date.desc()).limit(10).all()
+    
+    return [
+        {
+            "id": article.id,
+            "title": article.title,
+            "url": article.url,
+            "source": article.source,
+            "published_date": article.published_date.isoformat() if article.published_date else None,
+            "snippet": article.snippet,
+            "sentiment_score": article.sentiment_score,
+            "sentiment_label": article.sentiment_label,
+            "impact_score": article.impact_score
+        }
+        for article in articles
+    ] 

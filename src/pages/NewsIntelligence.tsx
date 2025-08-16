@@ -1,8 +1,11 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 // Temporarily using HTML select instead of Select component
-import { Clock, TrendingUp, TrendingDown, Eye } from "lucide-react";
+import { Clock, TrendingUp, TrendingDown, Eye, RefreshCw } from "lucide-react";
+import { config } from "@/config";
 
 const newsArticles = [
   {
@@ -110,26 +113,143 @@ interface NewsIntelligenceProps {
   customerId?: number | null;
 }
 
+interface NewsArticle {
+  id: number;
+  title: string;
+  url: string;
+  source: string;
+  published_date: string;
+  snippet: string;
+  category: string;
+  sentiment_score: number;
+  sentiment_label: string;
+  impact_score: number;
+  symbols: string[];
+  keywords: string[];
+  market_region: string;
+}
+
+interface TrendingTopic {
+  topic: string;
+  mentions: number;
+  sentiment: string;
+  change: string;
+}
+
+interface MarketSentimentMetric {
+  metric: string;
+  value: string;
+  score: number;
+}
+
 export default function NewsIntelligence({ customerId }: NewsIntelligenceProps) {
+  const [newsArticles, setNewsArticles] = useState<NewsArticle[]>([]);
+  const [trendingTopics, setTrendingTopics] = useState<TrendingTopic[]>([]);
+  const [marketSentiment, setMarketSentiment] = useState<MarketSentimentMetric[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState("All Categories");
+  const [selectedRegion, setSelectedRegion] = useState("US");
+
+  // Fetch news data
+  const fetchNewsData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch news articles
+      const newsResponse = await fetch(`${config.apiUrl}/news/?limit=20`);
+      if (newsResponse.ok) {
+        const newsData = await newsResponse.json();
+        setNewsArticles(newsData);
+      }
+
+      // Fetch trending topics
+      const trendingResponse = await fetch(`${config.apiUrl}/news/trending`);
+      if (trendingResponse.ok) {
+        const trendingData = await trendingResponse.json();
+        setTrendingTopics(trendingData);
+      }
+
+      // Fetch market sentiment
+      const sentimentResponse = await fetch(`${config.apiUrl}/news/sentiment`);
+      if (sentimentResponse.ok) {
+        const sentimentData = await sentimentResponse.json();
+        setMarketSentiment(sentimentData.market_metrics || []);
+      }
+
+    } catch (error) {
+      console.error('Error fetching news data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Update news feed
+  const updateNewsFeed = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${config.apiUrl}/news/update`, {
+        method: 'POST'
+      });
+      if (response.ok) {
+        // Refresh the data after update
+        await fetchNewsData();
+      }
+    } catch (error) {
+      console.error('Error updating news feed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNewsData();
+  }, []);
+
+  // Filter articles based on selected category
+  const filteredArticles = selectedCategory === "All Categories" 
+    ? newsArticles 
+    : newsArticles.filter(article => 
+        article.category.toLowerCase() === selectedCategory.toLowerCase()
+      );
+
   return (
     <div className="p-6 space-y-6">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">News Intelligence</h1>
         <div className="flex items-center gap-4">
-          <select className="w-32 px-3 py-2 border border-gray-200 rounded-lg" defaultValue="US">
+          <select 
+            className="w-32 px-3 py-2 border border-gray-200 rounded-lg" 
+            value={selectedRegion}
+            onChange={(e) => setSelectedRegion(e.target.value)}
+          >
             <option value="US">US</option>
             <option value="Global">Global</option>
             <option value="Europe">Europe</option>
             <option value="Asia">Asia</option>
           </select>
-          <select className="w-48 px-3 py-2 border border-gray-200 rounded-lg" defaultValue="All Categories">
+          <select 
+            className="w-48 px-3 py-2 border border-gray-200 rounded-lg" 
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+          >
             <option value="All Categories">All Categories</option>
             <option value="Economy">Economy</option>
             <option value="Technology">Technology</option>
             <option value="Healthcare">Healthcare</option>
             <option value="Energy">Energy</option>
+            <option value="Financial">Financial</option>
+            <option value="Markets">Markets</option>
           </select>
+          <Button 
+            onClick={updateNewsFeed}
+            disabled={loading}
+            variant="outline"
+            size="sm"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? 'Updating...' : 'Update Feed'}
+          </Button>
         </div>
       </div>
 
@@ -144,44 +264,59 @@ export default function NewsIntelligence({ customerId }: NewsIntelligenceProps) 
 
         {/* All News Tab */}
         <TabsContent value="all-news" className="space-y-6">
-          <div className="space-y-4">
-            {newsArticles.map((article) => (
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+              <span>Loading news articles...</span>
+            </div>
+          ) : filteredArticles.length === 0 ? (
+            <Card className="p-8 text-center">
+              <h3 className="text-lg font-semibold mb-2">No news articles found</h3>
+              <p className="text-gray-600 mb-4">Try updating the news feed or adjusting your filters.</p>
+              <Button onClick={updateNewsFeed} variant="outline">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Update News Feed
+              </Button>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {filteredArticles.map((article) => (
               <Card key={article.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <Badge variant={
-                          article.sentiment === "positive" ? "default" :
-                          article.sentiment === "negative" ? "destructive" : "secondary"
+                          article.sentiment_label === "positive" ? "default" :
+                          article.sentiment_label === "negative" ? "destructive" : "secondary"
                         }>
-                          {article.sentiment === "positive" ? (
+                          {article.sentiment_label === "positive" ? (
                             <TrendingUp className="w-3 h-3 mr-1" />
-                          ) : article.sentiment === "negative" ? (
+                          ) : article.sentiment_label === "negative" ? (
                             <TrendingDown className="w-3 h-3 mr-1" />
                           ) : null}
-                          {article.sentiment}
+                          {article.sentiment_label}
                         </Badge>
                         <Badge variant="outline" className="capitalize">
                           {article.category}
                         </Badge>
                         <Badge variant="outline">
-                          {article.category}
+                          Impact: {Math.round(article.impact_score * 100)}%
                         </Badge>
                       </div>
                       <h3 className="text-lg font-semibold text-gray-900 mb-2">
                         {article.title}
                       </h3>
                       <p className="text-gray-600 text-sm mb-3">
-                        {article.summary}
+                        {article.snippet}
                       </p>
                       <div className="flex items-center gap-4 text-sm text-gray-500">
                         <span>{article.source}</span>
                         <div className="flex items-center gap-1">
                           <Clock className="w-4 h-4" />
-                          <span>{article.time}</span>
+                          <span>{new Date(article.published_date).toLocaleString()}</span>
                         </div>
-                        <span>Market: {article.marketImpact}</span>
+                        <span>Market: {article.market_region}</span>
                       </div>
                     </div>
                   </div>
@@ -195,7 +330,7 @@ export default function NewsIntelligence({ customerId }: NewsIntelligenceProps) 
                           <div
                             key={level}
                             className={`w-2 h-2 rounded-full ${
-                              level <= (article.impact === "High" ? 4 : article.impact === "Medium" ? 3 : 2)
+                              level <= Math.ceil(article.impact_score * 5)
                                 ? "bg-red-500"
                                 : "bg-gray-300"
                             }`}
@@ -204,9 +339,14 @@ export default function NewsIntelligence({ customerId }: NewsIntelligenceProps) 
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {article.symbols.map((symbol) => (
+                      {article.symbols && article.symbols.map((symbol) => (
                         <Badge key={symbol} variant="outline" className="text-xs">
                           {symbol}
+                        </Badge>
+                      ))}
+                      {article.keywords && article.keywords.slice(0, 3).map((keyword) => (
+                        <Badge key={keyword} variant="secondary" className="text-xs">
+                          {keyword}
                         </Badge>
                       ))}
                     </div>
@@ -214,7 +354,8 @@ export default function NewsIntelligence({ customerId }: NewsIntelligenceProps) 
                 </CardContent>
               </Card>
             ))}
-          </div>
+            </div>
+          )}
         </TabsContent>
 
         {/* Trending Tab */}
@@ -225,8 +366,14 @@ export default function NewsIntelligence({ customerId }: NewsIntelligenceProps) 
               <p className="text-sm text-gray-600">Most discussed topics in financial news</p>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {trendingTopics.map((topic) => (
+              {loading ? (
+                <div className="flex items-center justify-center py-4">
+                  <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                  <span>Loading trending topics...</span>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {trendingTopics.map((topic) => (
                   <div
                     key={topic.topic}
                     className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
@@ -252,7 +399,8 @@ export default function NewsIntelligence({ customerId }: NewsIntelligenceProps) 
                     </div>
                   </div>
                 ))}
-              </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -267,8 +415,14 @@ export default function NewsIntelligence({ customerId }: NewsIntelligenceProps) 
                 <p className="text-sm text-gray-600">Real-time sentiment analysis</p>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {marketSentiment.map((item) => (
+                {loading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                    <span>Loading market sentiment...</span>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {marketSentiment.map((item) => (
                     <div key={item.metric} className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="font-medium">{item.metric}</span>
@@ -286,6 +440,7 @@ export default function NewsIntelligence({ customerId }: NewsIntelligenceProps) 
                     </div>
                   ))}
                 </div>
+                )}
               </CardContent>
             </Card>
 
@@ -297,16 +452,16 @@ export default function NewsIntelligence({ customerId }: NewsIntelligenceProps) 
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {newsArticles.filter(article => article.impact === "High").map((article) => (
+                  {filteredArticles.filter(article => article.impact_score > 0.6).map((article) => (
                     <div
                       key={article.id}
                       className="p-4 border border-gray-200 rounded-lg"
                     >
                       <h4 className="font-semibold mb-2">{article.title}</h4>
-                      <p className="text-sm text-gray-600 mb-2">{article.summary}</p>
+                      <p className="text-sm text-gray-600 mb-2">{article.snippet}</p>
                       <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>{article.source} • {article.time}</span>
-                        <Badge variant="destructive">High Impact</Badge>
+                        <span>{article.source} • {new Date(article.published_date).toLocaleString()}</span>
+                        <Badge variant="destructive">High Impact ({Math.round(article.impact_score * 100)}%)</Badge>
                       </div>
                     </div>
                   ))}
