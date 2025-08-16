@@ -6,15 +6,34 @@ import schemas
 from database import engine, get_db
 from fastapi.middleware.cors import CORSMiddleware
 from rag_utils import RAGPipeline
-import openai
+import openai  # Commented out OpenAI
 import json
 from pydantic import BaseModel
+from datetime import datetime
+import os
+from dotenv import load_dotenv
+from llm_utils import OllamaLLM
+from news_intelligence import news_agent
+from typing import Optional
+import asyncio
 
-# OpenAI Azure Configuration
-openai.api_type = "azure"
-openai.api_base = "https://eastusigtb.openai.azure.com/"
-openai.api_version = "2024-02-15-preview"
-openai.api_key = "34a93b9dd2bc45ef8d6f07e5ef92940e"
+# Multi-Agent Architecture Imports
+from simple_agents import simple_coordinator
+
+# Load environment variables
+load_dotenv()
+
+# Comment out OpenAI configuration
+openai.api_type = ""
+openai.api_base = ""
+openai.api_version = ""
+openai.api_key = ""
+
+# Initialize Ollama with the correct model name
+llm = OllamaLLM(
+    model_name="deepseek-r1:1.5b",  # Updated model name
+    base_url="http://localhost:11434"
+)
 
 models.Base.metadata.create_all(bind=engine)
 rag_pipeline = RAGPipeline()
@@ -252,14 +271,22 @@ async def chat_with_customer_data(
         latest_itr = customer.itr_data[-1] if customer.itr_data else None
         loan_metrics = customer.loan_eligibility_metrics
         credit_preferences = customer.credit_card_preferences
-        recent_transactions = customer.transactions[-5:] if customer.transactions else []  # Last 5 transactions
+        recent_transactions = customer.transactions[-5:] if customer.transactions else []
 
         # Prepare comprehensive financial context with markdown formatting
-        context_markdown = "## Customer Financial Profile\n\n"
+        context_markdown = "## Customer Profile\n\n"
         
-        # Basic Info
-        context_markdown += f"### Basic Information\n"
+        # Basic Info and Demographics
+        context_markdown += f"### Personal Information\n"
         context_markdown += f"- Name: {customer.name}\n"
+        context_markdown += f"- Age: {customer.age}\n"
+        context_markdown += f"- Occupation: {customer.occupation}\n"
+        if customer.interests:
+            context_markdown += f"- Interests: {', '.join(customer.interests)}\n"
+        if customer.lifestyle_preferences:
+            context_markdown += "\n#### Lifestyle Preferences\n"
+            for category, preference in customer.lifestyle_preferences.items():
+                context_markdown += f"- {category.replace('_', ' ').title()}: {preference}\n"
         
         # Credit and Loan Information
         if latest_bureau:
@@ -302,12 +329,6 @@ async def chat_with_customer_data(
             context_markdown += f"- Debt-to-Income Ratio: {loan_metrics.debt_to_income_ratio:.1f}% ({loan_metrics.dti_status})\n"
             context_markdown += f"- Current EMI Load: ₹{loan_metrics.current_emi_load:,.2f} ({loan_metrics.emi_status})\n"
 
-        # Recent Transactions
-        if recent_transactions:
-            context_markdown += f"\n### Recent Transactions\n"
-            for tx in recent_transactions:
-                context_markdown += f"- {tx.description}: ₹{tx.amount:,.2f}\n"
-
         # Credit Card Preferences
         if credit_preferences:
             context_markdown += f"\n### Credit Card Preferences\n"
@@ -319,35 +340,43 @@ async def chat_with_customer_data(
         # Prepare system message with instructions
         system_message = """You are an AI financial advisor with access to the customer's comprehensive financial data. 
         When answering questions:
-        1. Always reference specific numbers and data points from the customer's profile
-        2. Provide personalized advice based on their actual financial situation
-        3. Consider their credit score, income, spending patterns, and existing obligations
-        4. Format responses using markdown for better readability
-        5. Use ₹ symbol for Indian Rupee amounts
-        6. Format large numbers with commas
-        7. Use bullet points for lists
-        8. Bold important numbers and conclusions
-        
-        If you don't have certain information in the context, acknowledge that limitation in your response."""
+        1. Consider the customer's age, occupation, and interests for personalized recommendations
+        2. Factor in their lifestyle preferences and spending patterns
+        3. Always reference specific numbers and data points from their profile
+        4. Provide personalized advice based on their actual financial situation
+        5. Consider their credit score, income, spending patterns, and existing obligations
+        6. For credit card recommendations:
+           - Match cards to their interests (travel/dining/shopping)
+           - Consider their spending patterns and reward preferences
+           - Factor in their age and lifestyle for relevant perks
+           - Ensure recommendations align with their credit score and income
+        7. Format responses using markdown for better readability
+        8. Use ₹ symbol for Indian Rupee amounts
+        9. Format large numbers with commas
+        10. Use bullet points for lists
+        11. Bold important numbers and conclusions"""
 
-        # Prepare messages for OpenAI
-        messages = [
-            {"role": "system", "content": system_message},
-            {"role": "user", "content": f"Customer Financial Context:\n{context_markdown}\n\nPrevious Conversation:\n"},
-            *conversation_history[-4:],  # Include last 4 messages for context
-            {"role": "user", "content": query}
-        ]
+        # Prepare conversation context
+        conversation_context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in conversation_history[-4:]])
         
-        # Call OpenAI API
+        # Combine all context
+        full_context = f"""
+        {context_markdown}
+        
+        Previous Conversation:
+        {conversation_context}
+        
+        Current Query: {query}
+        """
+        
+        # Generate response using Ollama
         try:
-            response = openai.ChatCompletion.create(
-                engine="gpt4o",
-                messages=messages,
-                max_tokens=4096,
-                temperature=0.3
+            ai_response = llm.generate_response(
+                prompt=full_context,
+                system_prompt=system_message,
+                temperature=0.3,
+                max_tokens=2048
             )
-            
-            ai_response = response.choices[0].message.content
             
             return {
                 "query": query,
@@ -356,6 +385,12 @@ async def chat_with_customer_data(
                     "credit_score": latest_bureau.credit_score if latest_bureau else None,
                     "monthly_income": latest_itr.taxable_income/12 if latest_itr else None,
                     "current_balance": latest_aa.account_summary.get("savings_account", {}).get("balance") if latest_aa else None,
+                    "demographics": {
+                        "age": customer.age,
+                        "occupation": customer.occupation,
+                        "interests": customer.interests,
+                        "lifestyle_preferences": customer.lifestyle_preferences
+                    } if customer else None,
                     "loan_eligibility": {
                         "score": loan_metrics.eligibility_score if loan_metrics else None,
                         "status": loan_metrics.score_range if loan_metrics else None
@@ -364,7 +399,7 @@ async def chat_with_customer_data(
             }
             
         except Exception as e:
-            print(f"OpenAI API Error: {str(e)}")
+            print(f"LLM Error: {str(e)}")
             raise HTTPException(
                 status_code=500,
                 detail="Error generating response from AI service"
@@ -476,7 +511,7 @@ async def recommend_credit_cards(customer_id: int, db: Session = Depends(get_db)
     # Get all credit cards
     credit_cards = db.query(models.CreditCard).all()
 
-    # Prepare context for GPT-4
+    # Prepare context for LLM
     context = f"""
     Customer Profile:
     - Monthly Income: ₹{itr_data.taxable_income / 12:,.2f}
@@ -506,8 +541,8 @@ async def recommend_credit_cards(customer_id: int, db: Session = Depends(get_db)
           * Lifestyle: {card.lifestyle_benefits}
         """
 
-    # Prepare prompt for GPT-4
-    prompt = """You are a credit card recommendation expert. Based on the customer's profile and preferences, 
+    # Prepare prompt for LLM
+    system_prompt = """You are a credit card recommendation expert. Based on the customer's profile and preferences, 
     analyze the available credit cards and recommend the best options. Consider:
     1. Eligibility (income and credit score requirements)
     2. Match with spending patterns and lifestyle preferences
@@ -518,17 +553,12 @@ async def recommend_credit_cards(customer_id: int, db: Session = Depends(get_db)
     Format your response in markdown with clear sections and bullet points."""
 
     try:
-        response = openai.ChatCompletion.create(
-            engine="gpt4o",
-            messages=[
-                {"role": "system", "content": prompt},
-                {"role": "user", "content": f"Context:\n{context}\n\nProvide credit card recommendations for this customer."}
-            ],
-            max_tokens=4096,
-            temperature=0.3
+        recommendations = llm.generate_response(
+            prompt=context,
+            system_prompt=system_prompt,
+            temperature=0.3,
+            max_tokens=2048
         )
-
-        recommendations = response.choices[0].message.content
 
         return {
             "customer_profile": {
@@ -543,4 +573,450 @@ async def recommend_credit_cards(customer_id: int, db: Session = Depends(get_db)
         raise HTTPException(
             status_code=500,
             detail=f"Error generating recommendations: {str(e)}"
-        ) 
+        )
+
+@app.get("/credit-cards/updates")
+def get_credit_card_updates(db: Session = Depends(get_db)):
+    """Get all active credit card updates and offers"""
+    current_time = datetime.now()
+    updates = db.query(models.CreditCardUpdate).filter(
+        models.CreditCardUpdate.is_active == True,
+        models.CreditCardUpdate.valid_from <= current_time,
+        models.CreditCardUpdate.valid_until >= current_time
+    ).all()
+    
+    # Group updates by card
+    grouped_updates = {}
+    for update in updates:
+        if update.card_id not in grouped_updates:
+            grouped_updates[update.card_id] = {
+                "card": {
+                    "bank_name": update.credit_card.bank_name,
+                    "card_name": update.credit_card.card_name,
+                },
+                "updates": []
+            }
+        grouped_updates[update.card_id]["updates"].append({
+            "id": update.id,
+            "type": update.update_type,
+            "title": update.title,
+            "description": update.description,
+            "valid_until": update.valid_until.isoformat()
+        })
+    
+    return grouped_updates
+
+@app.get("/credit-cards/{card_id}/updates")
+def get_card_updates(card_id: int, db: Session = Depends(get_db)):
+    """Get updates for a specific credit card"""
+    current_time = datetime.now()
+    updates = db.query(models.CreditCardUpdate).filter(
+        models.CreditCardUpdate.card_id == card_id,
+        models.CreditCardUpdate.is_active == True,
+        models.CreditCardUpdate.valid_from <= current_time,
+        models.CreditCardUpdate.valid_until >= current_time
+    ).all()
+    
+    return [
+        {
+            "id": update.id,
+            "type": update.update_type,
+            "title": update.title,
+            "description": update.description,
+            "valid_from": update.valid_from.isoformat(),
+            "valid_until": update.valid_until.isoformat()
+        }
+        for update in updates
+    ]
+
+@app.post("/credit-cards/{card_id}/updates")
+def create_card_update(
+    card_id: int,
+    update: dict,
+    db: Session = Depends(get_db)
+):
+    """Create a new update or offer for a credit card"""
+    db_update = models.CreditCardUpdate(
+        card_id=card_id,
+        **update
+    )
+    db.add(db_update)
+    db.commit()
+    db.refresh(db_update)
+    return db_update
+
+# News Intelligence API Endpoints
+@app.get("/news/")
+async def get_news_articles(
+    category: Optional[str] = None,
+    sentiment: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0,
+    db: Session = Depends(get_db)
+):
+    """Get news articles with optional filtering"""
+    query = db.query(models.NewsArticle).filter(models.NewsArticle.is_active == True)
+    
+    if category:
+        query = query.filter(models.NewsArticle.category == category)
+    
+    if sentiment:
+        query = query.filter(models.NewsArticle.sentiment_label == sentiment)
+    
+    # Order by impact score and published date
+    articles = query.order_by(
+        models.NewsArticle.impact_score.desc(),
+        models.NewsArticle.published_date.desc()
+    ).offset(offset).limit(limit).all()
+    
+    return [
+        {
+            "id": article.id,
+            "title": article.title,
+            "url": article.url,
+            "source": article.source,
+            "published_date": article.published_date.isoformat() if article.published_date else None,
+            "snippet": article.snippet,
+            "category": article.category,
+            "sentiment_score": article.sentiment_score,
+            "sentiment_label": article.sentiment_label,
+            "impact_score": article.impact_score,
+            "symbols": article.symbols,
+            "keywords": article.keywords,
+            "market_region": article.market_region
+        }
+        for article in articles
+    ]
+
+@app.get("/news/trending")
+async def get_trending_topics(db: Session = Depends(get_db)):
+    """Get trending topics based on recent news"""
+    # Get news from last 24 hours
+    from datetime import timedelta
+    cutoff_date = datetime.utcnow() - timedelta(hours=24)
+    
+    recent_articles = db.query(models.NewsArticle).filter(
+        models.NewsArticle.is_active == True,
+        models.NewsArticle.published_date >= cutoff_date
+    ).all()
+    
+    # Count keyword frequency
+    keyword_counts = {}
+    sentiment_by_keyword = {}
+    
+    for article in recent_articles:
+        if article.keywords:
+            for keyword in article.keywords:
+                keyword_counts[keyword] = keyword_counts.get(keyword, 0) + 1
+                if keyword not in sentiment_by_keyword:
+                    sentiment_by_keyword[keyword] = []
+                sentiment_by_keyword[keyword].append(article.sentiment_score or 0)
+    
+    # Calculate trending topics
+    trending = []
+    for keyword, count in sorted(keyword_counts.items(), key=lambda x: x[1], reverse=True)[:10]:
+        avg_sentiment = sum(sentiment_by_keyword[keyword]) / len(sentiment_by_keyword[keyword])
+        sentiment_label = "Bullish" if avg_sentiment > 0.1 else "Bearish" if avg_sentiment < -0.1 else "Neutral"
+        
+        trending.append({
+            "topic": keyword.title(),
+            "mentions": count,
+            "sentiment": sentiment_label,
+            "change": f"+{count * 5}%"  # Simplified change calculation
+        })
+    
+    return trending
+
+@app.get("/news/sentiment")
+async def get_market_sentiment(db: Session = Depends(get_db)):
+    """Get overall market sentiment analysis"""
+    from datetime import timedelta
+    cutoff_date = datetime.utcnow() - timedelta(hours=24)
+    
+    recent_articles = db.query(models.NewsArticle).filter(
+        models.NewsArticle.is_active == True,
+        models.NewsArticle.published_date >= cutoff_date
+    ).all()
+    
+    if not recent_articles:
+        return {"error": "No recent articles found"}
+    
+    # Calculate sentiment metrics
+    total_articles = len(recent_articles)
+    positive_count = sum(1 for article in recent_articles if article.sentiment_label == "positive")
+    negative_count = sum(1 for article in recent_articles if article.sentiment_label == "negative")
+    neutral_count = total_articles - positive_count - negative_count
+    
+    avg_sentiment = sum(article.sentiment_score or 0 for article in recent_articles) / total_articles
+    avg_impact = sum(article.impact_score or 0 for article in recent_articles) / total_articles
+    
+    return {
+        "overall_sentiment": "Positive" if avg_sentiment > 0.1 else "Negative" if avg_sentiment < -0.1 else "Neutral",
+        "sentiment_score": round(avg_sentiment, 3),
+        "total_articles": total_articles,
+        "sentiment_distribution": {
+            "positive": round(positive_count / total_articles * 100, 1),
+            "neutral": round(neutral_count / total_articles * 100, 1),
+            "negative": round(negative_count / total_articles * 100, 1)
+        },
+        "market_metrics": [
+            {
+                "metric": "Overall Sentiment",
+                "value": "Positive" if avg_sentiment > 0.1 else "Negative" if avg_sentiment < -0.1 else "Neutral",
+                "score": round((avg_sentiment + 1) * 50, 0)  # Convert -1 to 1 range to 0-100
+            },
+            {
+                "metric": "News Volume",
+                "value": "High" if total_articles > 50 else "Medium" if total_articles > 20 else "Low",
+                "score": min(total_articles * 2, 100)
+            },
+            {
+                "metric": "Market Impact",
+                "value": "High" if avg_impact > 0.6 else "Medium" if avg_impact > 0.3 else "Low",
+                "score": round(avg_impact * 100, 0)
+            }
+        ]
+    }
+
+@app.get("/news/categories")
+async def get_news_by_category(db: Session = Depends(get_db)):
+    """Get news articles grouped by category"""
+    from sqlalchemy import func
+    
+    # Get article counts by category
+    category_counts = db.query(
+        models.NewsArticle.category,
+        func.count(models.NewsArticle.id).label('count')
+    ).filter(
+        models.NewsArticle.is_active == True
+    ).group_by(models.NewsArticle.category).all()
+    
+    result = {}
+    for category, count in category_counts:
+        # Get recent articles for this category
+        articles = db.query(models.NewsArticle).filter(
+            models.NewsArticle.category == category,
+            models.NewsArticle.is_active == True
+        ).order_by(models.NewsArticle.published_date.desc()).limit(5).all()
+        
+        result[category] = {
+            "count": count,
+            "articles": [
+                {
+                    "id": article.id,
+                    "title": article.title,
+                    "source": article.source,
+                    "sentiment_label": article.sentiment_label,
+                    "impact_score": article.impact_score,
+                    "published_date": article.published_date.isoformat() if article.published_date else None
+                }
+                for article in articles
+            ]
+        }
+    
+    return result
+
+@app.post("/news/update")
+async def update_news_feed(db: Session = Depends(get_db)):
+    """Manually trigger news feed update"""
+    try:
+        result = await news_agent.update_news_feed(db)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error updating news feed: {str(e)}")
+
+@app.get("/news/symbols/{symbol}")
+async def get_news_by_symbol(symbol: str, db: Session = Depends(get_db)):
+    """Get news articles related to a specific stock symbol"""
+    articles = db.query(models.NewsArticle).filter(
+        models.NewsArticle.symbols.contains([symbol.upper()]),
+        models.NewsArticle.is_active == True
+    ).order_by(models.NewsArticle.published_date.desc()).limit(10).all()
+    
+    return [
+        {
+            "id": article.id,
+            "title": article.title,
+            "url": article.url,
+            "source": article.source,
+            "published_date": article.published_date.isoformat() if article.published_date else None,
+            "snippet": article.snippet,
+            "sentiment_score": article.sentiment_score,
+            "sentiment_label": article.sentiment_label,
+            "impact_score": article.impact_score
+        }
+        for article in articles
+    ]
+
+
+# ============================================================================
+# MULTI-AGENT ARCHITECTURE ENDPOINTS
+# ============================================================================
+
+class AgentChatRequest(BaseModel):
+    query: str
+    customer_id: Optional[int] = None
+
+class WorkflowRequest(BaseModel):
+    customer_id: Optional[int] = None
+    investment_amount: Optional[float] = None
+    investment_goal: Optional[str] = None
+    timeline: Optional[str] = None
+
+
+@app.post("/agents/chat/{agent_type}")
+async def chat_with_agent(agent_type: str, request: AgentChatRequest):
+    """Chat with a specific agent"""
+    try:
+        if agent_type not in simple_coordinator.agents:
+            raise HTTPException(status_code=404, detail=f"Agent type '{agent_type}' not found")
+        
+        agent = simple_coordinator.agents[agent_type]
+        response = agent.process_query(request.query, request.customer_id)
+        
+        return {
+            "response": response, 
+            "agent_type": agent_type,
+            "agent_role": agent.role
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Agent error: {str(e)}")
+
+
+@app.post("/agents/workflow/comprehensive-analysis")
+async def comprehensive_analysis(request: WorkflowRequest):
+    """Execute comprehensive customer analysis workflow"""
+    if not request.customer_id:
+        raise HTTPException(status_code=400, detail="Customer ID is required")
+    
+    try:
+        result = simple_coordinator.comprehensive_analysis(request.customer_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Workflow error: {str(e)}")
+
+
+@app.post("/agents/workflow/investment-recommendation")
+async def investment_recommendation(request: WorkflowRequest):
+    """Execute investment recommendation workflow"""
+    if not all([request.customer_id, request.investment_amount, request.investment_goal, request.timeline]):
+        raise HTTPException(
+            status_code=400, 
+            detail="customer_id, investment_amount, investment_goal, and timeline are required"
+        )
+    
+    try:
+        # Use financial advisor for investment recommendations
+        advisor = simple_coordinator.agents["financial_advisor"]
+        query = f"I want to invest ${request.investment_amount} for {request.investment_goal} over {request.timeline}"
+        recommendation = advisor.process_query(query, request.customer_id)
+        
+        return {
+            "recommendation": recommendation,
+            "customer_id": request.customer_id,
+            "investment_amount": request.investment_amount,
+            "investment_goal": request.investment_goal,
+            "timeline": request.timeline
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Workflow error: {str(e)}")
+
+
+@app.post("/agents/workflow/market-analysis")
+async def market_analysis():
+    """Execute comprehensive market analysis workflow"""
+    try:
+        # Use news intelligence agent for market analysis
+        news_agent = simple_coordinator.agents["news_intelligence"]
+        latest_news = news_agent.get_latest_news(10)
+        market_sentiment = news_agent.get_market_sentiment()
+        
+        return {
+            "analysis": {
+                "market_sentiment": market_sentiment,
+                "latest_news": latest_news,
+                "timestamp": datetime.now().isoformat()
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Workflow error: {str(e)}")
+
+
+@app.post("/agents/workflow/credit-optimization")
+async def credit_optimization(request: WorkflowRequest):
+    """Execute credit optimization workflow"""
+    if not request.customer_id:
+        raise HTTPException(status_code=400, detail="Customer ID is required")
+    
+    try:
+        # Use credit card specialist for credit optimization
+        credit_agent = simple_coordinator.agents["credit_card_specialist"]
+        analysis = credit_agent.analyze_credit_profile(request.customer_id)
+        
+        return {
+            "optimization": analysis, 
+            "customer_id": request.customer_id,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Workflow error: {str(e)}")
+
+
+@app.get("/agents/available")
+async def get_available_agents():
+    """Get list of available agents and their capabilities"""
+    return simple_coordinator.get_available_agents()
+
+
+@app.get("/agents/workflows")
+async def get_available_workflows():
+    """Get list of available multi-agent workflows"""
+    workflows_info = {
+        "comprehensive_analysis": {
+            "name": "Comprehensive Customer Analysis",
+            "description": "Multi-agent analysis of customer's complete financial profile",
+            "agents_involved": ["data_analyst", "portfolio_manager", "financial_advisor", "credit_card_specialist", "news_intelligence"],
+            "required_params": ["customer_id"],
+            "endpoint": "/agents/workflow/comprehensive-analysis"
+        },
+        "investment_recommendation": {
+            "name": "Investment Recommendation",
+            "description": "AI-powered investment recommendations based on customer profile and market conditions",
+            "agents_involved": ["data_analyst", "news_intelligence", "portfolio_manager", "financial_advisor"],
+            "required_params": ["customer_id", "investment_amount", "investment_goal", "timeline"],
+            "endpoint": "/agents/workflow/investment-recommendation"
+        },
+        "market_analysis": {
+            "name": "Market Analysis",
+            "description": "Comprehensive market analysis combining news, data, and investment insights",
+            "agents_involved": ["news_intelligence", "data_analyst", "portfolio_manager"],
+            "required_params": [],
+            "endpoint": "/agents/workflow/market-analysis"
+        },
+        "credit_optimization": {
+            "name": "Credit Optimization",
+            "description": "Multi-agent credit analysis and optimization strategy",
+            "agents_involved": ["data_analyst", "credit_card_specialist", "financial_advisor"],
+            "required_params": ["customer_id"],
+            "endpoint": "/agents/workflow/credit-optimization"
+        }
+    }
+    return {"workflows": workflows_info}
+
+
+# Enhanced chat endpoint with agent routing
+@app.post("/customers/{customer_id}/chat-agent/")
+async def chat_with_intelligent_agent(customer_id: int, request: schemas.ChatRequest, db: Session = Depends(get_db)):
+    """Enhanced chat endpoint that routes queries to appropriate agents"""
+    try:
+        # Route query to appropriate agent
+        result = simple_coordinator.route_query(request.message, customer_id)
+        
+        return {
+            "response": result["response"],
+            "agent_used": result["agent_used"],
+            "agent_role": result["agent_role"],
+            "customer_id": customer_id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Chat agent error: {str(e)}") 

@@ -1,0 +1,396 @@
+# =============================================================================
+# PYTHON SPECIFIC
+# =============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# celery beat schedule file
+celerybeat-schedule
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# =============================================================================
+# NODEJS / FRONTEND SPECIFIC
+# =============================================================================
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Snowpack dependency directory (https://snowpack.dev/)
+web_modules/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variable files
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+out
+
+# Nuxt.js build / generate output
+.nuxt
+dist
+
+# Gatsby files
+.cache/
+public
+
+# Vite build output
+dist/
+dist-ssr/
+
+# Svelte kit
+.svelte-kit
+
+# =============================================================================
+# DATABASE SPECIFIC
+# =============================================================================
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# PostgreSQL
+*.dump
+
+# MySQL
+*.sql
+
+# Database migrations (comment out if you want to track them)
+# **/migrations/versions/
+# alembic.ini
+
+# =============================================================================
+# FINANCE WIZARDRY BOT SPECIFIC
+# =============================================================================
+
+# Configuration files with sensitive data
+.env.production
+.env.staging
+config.local.json
+secrets.json
+
+# Model files and caches
+*.model
+*.pkl
+*.pickle
+models/downloaded/
+embeddings/
+cache/
+
+# Data files
+data/raw/
+data/processed/
+*.csv
+*.xlsx
+*.json
+!sample_*.json
+!config/*.json
+
+# Log files
+logs/
+*.log
+debug.log
+error.log
+access.log
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+*.temp
+
+# API keys and credentials
+api_keys.txt
+credentials.json
+service_account.json
+
+# Development databases
+dev.db
+test.db
+development.sqlite
+
+# Ollama model downloads (too large for git)
+ollama_models/
+models/ollama/
+
+# News data cache
+news_cache/
+*.news
+
+# Financial data
+financial_data/
+market_data/
+
+# =============================================================================
+# EDITOR / IDE SPECIFIC
+# =============================================================================
+
+# Visual Studio Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# =============================================================================
+# OPERATING SYSTEM SPECIFIC
+# =============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# =============================================================================
+# MISCELLANEOUS
+# =============================================================================
+
+# Backup files
+*.backup
+*.bak
+*.orig
+*~
+
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Large files that shouldn't be in git
+*.mp4
+*.avi
+*.mov
+*.mp3
+*.wav
+*.pdf
+*.doc
+*.docx
+*.ppt
+*.pptx
+
+# Test output
+test-results/
+coverage/
+.coverage
+htmlcov/
+
+# Temporary test files
+test_*.py.temp
+*_test_temp.py
