@@ -189,6 +189,7 @@ def create_sample_data():
                 "total_loans": 3,
                 "active_loans": 2,
                 "on_time_payments": "95%",
+                "credit_utilization": random.randint(15, 45),  # Random credit utilization between 15-45%
                 "last_12_months": {
                     "payments_made": 24,
                     "late_payments": 1

@@ -11,7 +11,8 @@ import {
   Settings,
   MessageSquare,
   CreditCard,
-  Bot
+  Bot,
+  Brain
 } from "lucide-react";
 
 const navigation = [
@@ -54,6 +55,11 @@ const navigation = [
     name: "Chat Assistant",
     href: "/chat",
     icon: MessageSquare,
+  },
+  {
+    name: "AI Agents",
+    href: "/agent-chat",
+    icon: Brain,
   },
 ];
 

@@ -84,4 +84,24 @@ class Customer(CustomerBase):
     itr_data: List[ITRData] = []
 
     class Config:
-        from_attributes = True 
+        from_attributes = True
+
+class ChatRequest(BaseModel):
+    message: str
+    conversation_history: Optional[List[Dict[str, Any]]] = []
+
+class ChatResponse(BaseModel):
+    response: str
+    agent_type: Optional[str] = None
+    agent_role: Optional[str] = None
+    customer_id: Optional[int] = None
+
+class AgentChatRequest(BaseModel):
+    query: str
+    customer_id: Optional[int] = None
+
+class WorkflowRequest(BaseModel):
+    customer_id: Optional[int] = None
+    investment_amount: Optional[float] = None
+    investment_goal: Optional[str] = None
+    timeline: Optional[str] = None

@@ -17,6 +17,9 @@ from news_intelligence import news_agent
 from typing import Optional
 import asyncio
 
+# Multi-Agent Architecture Imports
+from simple_agents import simple_coordinator
+
 # Load environment variables
 load_dotenv()
 
@@ -843,4 +846,177 @@ async def get_news_by_symbol(symbol: str, db: Session = Depends(get_db)):
             "impact_score": article.impact_score
         }
         for article in articles
-    ] 
+    ]
+
+
+# ============================================================================
+# MULTI-AGENT ARCHITECTURE ENDPOINTS
+# ============================================================================
+
+class AgentChatRequest(BaseModel):
+    query: str
+    customer_id: Optional[int] = None
+
+class WorkflowRequest(BaseModel):
+    customer_id: Optional[int] = None
+    investment_amount: Optional[float] = None
+    investment_goal: Optional[str] = None
+    timeline: Optional[str] = None
+
+
+@app.post("/agents/chat/{agent_type}")
+async def chat_with_agent(agent_type: str, request: AgentChatRequest):
+    """Chat with a specific agent"""
+    try:
+        if agent_type not in simple_coordinator.agents:
+            raise HTTPException(status_code=404, detail=f"Agent type '{agent_type}' not found")
+        
+        agent = simple_coordinator.agents[agent_type]
+        response = agent.process_query(request.query, request.customer_id)
+        
+        return {
+            "response": response, 
+            "agent_type": agent_type,
+            "agent_role": agent.role
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Agent error: {str(e)}")
+
+
+@app.post("/agents/workflow/comprehensive-analysis")
+async def comprehensive_analysis(request: WorkflowRequest):
+    """Execute comprehensive customer analysis workflow"""
+    if not request.customer_id:
+        raise HTTPException(status_code=400, detail="Customer ID is required")
+    
+    try:
+        result = simple_coordinator.comprehensive_analysis(request.customer_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Workflow error: {str(e)}")
+
+
+@app.post("/agents/workflow/investment-recommendation")
+async def investment_recommendation(request: WorkflowRequest):
+    """Execute investment recommendation workflow"""
+    if not all([request.customer_id, request.investment_amount, request.investment_goal, request.timeline]):
+        raise HTTPException(
+            status_code=400, 
+            detail="customer_id, investment_amount, investment_goal, and timeline are required"
+        )
+    
+    try:
+        # Use financial advisor for investment recommendations
+        advisor = simple_coordinator.agents["financial_advisor"]
+        query = f"I want to invest ${request.investment_amount} for {request.investment_goal} over {request.timeline}"
+        recommendation = advisor.process_query(query, request.customer_id)
+        
+        return {
+            "recommendation": recommendation,
+            "customer_id": request.customer_id,
+            "investment_amount": request.investment_amount,
+            "investment_goal": request.investment_goal,
+            "timeline": request.timeline
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Workflow error: {str(e)}")
+
+
+@app.post("/agents/workflow/market-analysis")
+async def market_analysis():
+    """Execute comprehensive market analysis workflow"""
+    try:
+        # Use news intelligence agent for market analysis
+        news_agent = simple_coordinator.agents["news_intelligence"]
+        latest_news = news_agent.get_latest_news(10)
+        market_sentiment = news_agent.get_market_sentiment()
+        
+        return {
+            "analysis": {
+                "market_sentiment": market_sentiment,
+                "latest_news": latest_news,
+                "timestamp": datetime.now().isoformat()
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Workflow error: {str(e)}")
+
+
+@app.post("/agents/workflow/credit-optimization")
+async def credit_optimization(request: WorkflowRequest):
+    """Execute credit optimization workflow"""
+    if not request.customer_id:
+        raise HTTPException(status_code=400, detail="Customer ID is required")
+    
+    try:
+        # Use credit card specialist for credit optimization
+        credit_agent = simple_coordinator.agents["credit_card_specialist"]
+        analysis = credit_agent.analyze_credit_profile(request.customer_id)
+        
+        return {
+            "optimization": analysis, 
+            "customer_id": request.customer_id,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Workflow error: {str(e)}")
+
+
+@app.get("/agents/available")
+async def get_available_agents():
+    """Get list of available agents and their capabilities"""
+    return simple_coordinator.get_available_agents()
+
+
+@app.get("/agents/workflows")
+async def get_available_workflows():
+    """Get list of available multi-agent workflows"""
+    workflows_info = {
+        "comprehensive_analysis": {
+            "name": "Comprehensive Customer Analysis",
+            "description": "Multi-agent analysis of customer's complete financial profile",
+            "agents_involved": ["data_analyst", "portfolio_manager", "financial_advisor", "credit_card_specialist", "news_intelligence"],
+            "required_params": ["customer_id"],
+            "endpoint": "/agents/workflow/comprehensive-analysis"
+        },
+        "investment_recommendation": {
+            "name": "Investment Recommendation",
+            "description": "AI-powered investment recommendations based on customer profile and market conditions",
+            "agents_involved": ["data_analyst", "news_intelligence", "portfolio_manager", "financial_advisor"],
+            "required_params": ["customer_id", "investment_amount", "investment_goal", "timeline"],
+            "endpoint": "/agents/workflow/investment-recommendation"
+        },
+        "market_analysis": {
+            "name": "Market Analysis",
+            "description": "Comprehensive market analysis combining news, data, and investment insights",
+            "agents_involved": ["news_intelligence", "data_analyst", "portfolio_manager"],
+            "required_params": [],
+            "endpoint": "/agents/workflow/market-analysis"
+        },
+        "credit_optimization": {
+            "name": "Credit Optimization",
+            "description": "Multi-agent credit analysis and optimization strategy",
+            "agents_involved": ["data_analyst", "credit_card_specialist", "financial_advisor"],
+            "required_params": ["customer_id"],
+            "endpoint": "/agents/workflow/credit-optimization"
+        }
+    }
+    return {"workflows": workflows_info}
+
+
+# Enhanced chat endpoint with agent routing
+@app.post("/customers/{customer_id}/chat-agent/")
+async def chat_with_intelligent_agent(customer_id: int, request: schemas.ChatRequest, db: Session = Depends(get_db)):
+    """Enhanced chat endpoint that routes queries to appropriate agents"""
+    try:
+        # Route query to appropriate agent
+        result = simple_coordinator.route_query(request.message, customer_id)
+        
+        return {
+            "response": result["response"],
+            "agent_used": result["agent_used"],
+            "agent_role": result["agent_role"],
+            "customer_id": customer_id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Chat agent error: {str(e)}") 
