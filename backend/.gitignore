@@ -239,6 +239,7 @@ data/processed/
 *.json
 !sample_*.json
 !config/*.json
+__pycache__/
 
 # Log files
 logs/
