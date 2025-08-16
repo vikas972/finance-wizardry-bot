@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import Customer, AAData, BureauData, ITRData, NewsArticle
 from news_intelligence import NewsIntelligenceAgent
-from llm_utils import OllamaLLM
+from core.services.llm_service import LLMService
+from config.app_config import app_config
 from datetime import datetime, timedelta
 from sqlalchemy import desc
 
@@ -32,7 +33,7 @@ class SimpleNewsIntelligenceAgent(SimpleFinanceAgent):
     def __init__(self):
         super().__init__("news_intelligence", "News Intelligence Specialist")
         self.news_agent = NewsIntelligenceAgent()
-        self.llm = OllamaLLM()
+        self.llm = LLMService(agent_type="news_intelligence")
     
     def get_latest_news(self, limit: int = 10) -> Dict[str, Any]:
         """Get latest news articles"""
@@ -183,7 +184,7 @@ class SimpleFinancialAdvisorAgent(SimpleFinanceAgent):
     
     def __init__(self):
         super().__init__("financial_advisor", "Financial Advisor")
-        self.llm = OllamaLLM()
+        self.llm = LLMService(agent_type="financial_advisor")
     
     def get_customer_profile(self, customer_id: int) -> Dict[str, Any]:
         """Get customer financial profile"""
@@ -321,7 +322,7 @@ class SimpleCreditCardAgent(SimpleFinanceAgent):
     
     def __init__(self):
         super().__init__("credit_card_specialist", "Credit Card Specialist")
-        self.llm = OllamaLLM()
+        self.llm = LLMService(agent_type="credit_specialist")
     
     def analyze_credit_profile(self, customer_id: int) -> Dict[str, Any]:
         """Analyze customer's credit profile"""
